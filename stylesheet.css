@@ -1,0 +1,95 @@
+/* WiFi Signal Plus - Stylesheet */
+
+/* Panel indicator */
+.wifi-signal-plus-indicator {
+    padding: 0 4px;
+}
+
+.wifi-signal-plus-label {
+    font-weight: bold;
+}
+
+/* Generation colors */
+.wifi-gen-4 {
+    color: #888888;
+}
+
+.wifi-gen-5 {
+    color: #3584e4;
+}
+
+.wifi-gen-6 {
+    color: #33d17a;
+}
+
+.wifi-gen-7 {
+    color: #9141ac;
+}
+
+.wifi-disconnected {
+    color: #c0bfbc;
+}
+
+/* Tooltip popup */
+.wifi-signal-plus-popup {
+    padding: 12px;
+    min-width: 280px;
+}
+
+.wifi-popup-section {
+    padding: 8px 0;
+}
+
+.wifi-popup-section:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wifi-popup-header {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.wifi-popup-ssid {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.wifi-popup-generation {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.wifi-popup-row {
+    padding: 2px 0;
+}
+
+.wifi-popup-label {
+    opacity: 0.7;
+    margin-right: 8px;
+}
+
+.wifi-popup-value {
+    font-weight: 500;
+}
+
+/* Signal strength indicator */
+.wifi-signal-excellent {
+    color: #33d17a;
+}
+
+.wifi-signal-good {
+    color: #8ff0a4;
+}
+
+.wifi-signal-fair {
+    color: #f6d32d;
+}
+
+.wifi-signal-weak {
+    color: #ff7800;
+}
+
+.wifi-signal-poor {
+    color: #e01b24;
+}

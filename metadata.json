@@ -1,0 +1,8 @@
+{
+    "uuid": "wifi-signal-plus@music-music.music",
+    "name": "WiFi Signal Plus",
+    "description": "Displays WiFi generation (4/5/6/7) in the top bar with detailed connection info on hover",
+    "shell-version": ["45", "46", "47", "48", "49"],
+    "version": 1,
+    "url": "https://github.com/music-music/wifi-signal-plus"
+}
