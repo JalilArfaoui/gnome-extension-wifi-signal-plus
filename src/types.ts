@@ -17,6 +17,9 @@ export type GuardIntervalUs = Brand<number, 'GuardIntervalUs'>;
 
 export const WIFI_GENERATIONS = {
     UNKNOWN: 0,
+    WIFI_1: 1,
+    WIFI_2: 2,
+    WIFI_3: 3,
     WIFI_4: 4,
     WIFI_5: 5,
     WIFI_6: 6,
@@ -25,11 +28,14 @@ export const WIFI_GENERATIONS = {
 
 export type WifiGeneration = (typeof WIFI_GENERATIONS)[keyof typeof WIFI_GENERATIONS];
 
-export function isKnownGeneration(gen: WifiGeneration): gen is 4 | 5 | 6 | 7 {
-    return gen >= WIFI_GENERATIONS.WIFI_4 && gen <= WIFI_GENERATIONS.WIFI_7;
+export function isKnownGeneration(gen: WifiGeneration): gen is 1 | 2 | 3 | 4 | 5 | 6 | 7 {
+    return gen >= WIFI_GENERATIONS.WIFI_1 && gen <= WIFI_GENERATIONS.WIFI_7;
 }
 
 export const IEEE_STANDARDS = {
+    [WIFI_GENERATIONS.WIFI_1]: '802.11b',
+    [WIFI_GENERATIONS.WIFI_2]: '802.11a',
+    [WIFI_GENERATIONS.WIFI_3]: '802.11g',
     [WIFI_GENERATIONS.WIFI_4]: '802.11n',
     [WIFI_GENERATIONS.WIFI_5]: '802.11ac',
     [WIFI_GENERATIONS.WIFI_6]: '802.11ax',
@@ -64,10 +70,13 @@ export const SECURITY_PROTOCOLS = [
 
 export type SecurityProtocol = (typeof SECURITY_PROTOCOLS)[number];
 
-export type GenerationCssClass = `wifi-gen-${4 | 5 | 6 | 7}` | 'wifi-disconnected';
+export type GenerationCssClass = `wifi-gen-${1 | 2 | 3 | 4 | 5 | 6 | 7}` | 'wifi-disconnected';
 export type SignalCssClass = `wifi-signal-${Lowercase<Exclude<SignalQuality, 'Unknown'>>}` | '';
 
 export const GENERATION_CSS_CLASSES = {
+    [WIFI_GENERATIONS.WIFI_1]: 'wifi-gen-1',
+    [WIFI_GENERATIONS.WIFI_2]: 'wifi-gen-2',
+    [WIFI_GENERATIONS.WIFI_3]: 'wifi-gen-3',
     [WIFI_GENERATIONS.WIFI_4]: 'wifi-gen-4',
     [WIFI_GENERATIONS.WIFI_5]: 'wifi-gen-5',
     [WIFI_GENERATIONS.WIFI_6]: 'wifi-gen-6',

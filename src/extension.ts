@@ -5,6 +5,7 @@
  */
 
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -24,6 +25,7 @@ import {
     GENERATION_CSS_CLASSES,
     getGenerationLabel,
     getGenerationDescription,
+    getGenerationIconFilename,
 } from './wifiGeneration.js';
 import type { GenerationCssClass, ChannelWidthMHz, SignalDbm } from './types.js';
 
@@ -69,6 +71,7 @@ const MENU_STRUCTURE: readonly MenuItemConfig[][] = [
 
 export default class WifiSignalPlusExtension extends Extension {
     private indicator: PanelMenu.Button | null = null;
+    private icon: St.Icon | null = null;
     private label: St.Label | null = null;
     private wifiService: WifiInfoService | null = null;
     private refreshTimeout: number | null = null;
@@ -95,6 +98,7 @@ export default class WifiSignalPlusExtension extends Extension {
 
         this.indicator = null;
         this.wifiService = null;
+        this.icon = null;
         this.label = null;
         this.menuItems.clear();
     }
@@ -103,12 +107,18 @@ export default class WifiSignalPlusExtension extends Extension {
         this.indicator = new PanelMenu.Button(0.0, this.metadata.name, false);
         this.indicator.add_style_class_name('wifi-signal-plus-indicator');
 
+        this.icon = new St.Icon({
+            style_class: 'system-status-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
         this.label = new St.Label({
             text: 'WiFi',
             y_align: Clutter.ActorAlign.CENTER,
             style_class: 'wifi-signal-plus-label',
         });
 
+        this.indicator.add_child(this.icon);
         this.indicator.add_child(this.label);
         this.buildMenu();
 
@@ -153,17 +163,31 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private updateIndicatorLabel(info: WifiConnectionInfo): void {
-        if (!this.label) return;
+        if (!this.icon || !this.label) return;
 
         this.clearGenerationStyles();
 
         if (!isConnected(info)) {
+            this.icon.visible = false;
+            this.label.visible = true;
             this.label.set_text('WiFi --');
             this.label.add_style_class_name(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.UNKNOWN]);
             return;
         }
 
-        this.label.set_text(getGenerationLabel(info.generation));
+        const iconFilename = getGenerationIconFilename(info.generation);
+        if (iconFilename) {
+            const iconPath = GLib.build_filenamev([this.path, 'icons', iconFilename]);
+            const file = Gio.File.new_for_path(iconPath);
+            this.icon.gicon = new Gio.FileIcon({ file });
+            this.icon.visible = true;
+            this.label.visible = false;
+        } else {
+            this.icon.visible = false;
+            this.label.visible = true;
+            this.label.set_text(getGenerationLabel(info.generation));
+        }
+
         this.label.add_style_class_name(GENERATION_CSS_CLASSES[info.generation]);
     }
 

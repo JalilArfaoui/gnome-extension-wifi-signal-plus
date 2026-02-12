@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "copy-assets": "cp metadata.json stylesheet.css dist/",
+    "copy-assets": "cp metadata.json stylesheet.css dist/ && cp -r src/icons dist/",
     "install-extension": "npm run build && rm -rf ~/.local/share/gnome-shell/extensions/wifi-signal-plus@music-music.music && cp -r dist ~/.local/share/gnome-shell/extensions/wifi-signal-plus@music-music.music",
     "nested": "npm run install-extension && MUTTER_DEBUG_DUMMY_MODE_SPECS=1920x1080 dbus-run-session gnome-shell --devkit --wayland",
     "watch": "tsc --watch",

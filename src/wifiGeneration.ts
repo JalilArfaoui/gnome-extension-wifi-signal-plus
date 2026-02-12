@@ -81,6 +81,8 @@ export function parseIwLinkOutput(iwOutput: string): IwLinkInfo {
         parseLine(line.trim(), result);
     }
 
+    detectLegacyGeneration(result);
+
     return freezeResult(result);
 }
 
@@ -99,6 +101,28 @@ function createMutableResult(): MutableParseResult {
         ssid: null,
         bssid: null,
     };
+}
+
+const WIFI_1_MAX_BITRATE = 11;
+const FREQ_5GHZ_START = 5000;
+
+function detectLegacyGeneration(result: MutableParseResult): void {
+    if (result.generation !== WIFI_GENERATIONS.UNKNOWN) return;
+    if (result.frequency === null) return;
+
+    if (result.frequency >= FREQ_5GHZ_START) {
+        result.generation = WIFI_GENERATIONS.WIFI_2;
+        return;
+    }
+
+    const maxBitrate = Math.max(
+        (result.txBitrate as number | null) ?? 0,
+        (result.rxBitrate as number | null) ?? 0
+    );
+    if (maxBitrate === 0) return;
+
+    result.generation =
+        maxBitrate <= WIFI_1_MAX_BITRATE ? WIFI_GENERATIONS.WIFI_1 : WIFI_GENERATIONS.WIFI_3;
 }
 
 function freezeResult(result: MutableParseResult): IwLinkInfo {
@@ -284,4 +308,19 @@ export function getGenerationDescription(generation: WifiGeneration): string {
     return isKnownGeneration(generation)
         ? `WiFi ${generation} (${IEEE_STANDARDS[generation]})`
         : 'WiFi';
+}
+
+const GENERATION_ICON_FILENAMES: Record<WifiGeneration, string | null> = {
+    [WIFI_GENERATIONS.WIFI_1]: 'wifi-1.svg',
+    [WIFI_GENERATIONS.WIFI_2]: 'wifi-2.svg',
+    [WIFI_GENERATIONS.WIFI_3]: 'wifi-3.svg',
+    [WIFI_GENERATIONS.WIFI_4]: 'wifi-4.png',
+    [WIFI_GENERATIONS.WIFI_5]: 'wifi-5.png',
+    [WIFI_GENERATIONS.WIFI_6]: 'wifi-6.png',
+    [WIFI_GENERATIONS.WIFI_7]: 'wifi-7.png',
+    [WIFI_GENERATIONS.UNKNOWN]: null,
+} as const;
+
+export function getGenerationIconFilename(generation: WifiGeneration): string | null {
+    return GENERATION_ICON_FILENAMES[generation];
 }

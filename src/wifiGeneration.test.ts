@@ -7,6 +7,7 @@ import {
     GENERATION_CSS_CLASSES,
     getGenerationLabel,
     getGenerationDescription,
+    getGenerationIconFilename,
     isKnownGeneration,
 } from './wifiGeneration';
 import { GUARD_INTERVALS } from './types';
@@ -37,6 +38,9 @@ describe('createEmptyIwLinkInfo', () => {
 
 describe('isKnownGeneration', () => {
     it('should return true for known generations', () => {
+        expect(isKnownGeneration(WIFI_GENERATIONS.WIFI_1)).toBe(true);
+        expect(isKnownGeneration(WIFI_GENERATIONS.WIFI_2)).toBe(true);
+        expect(isKnownGeneration(WIFI_GENERATIONS.WIFI_3)).toBe(true);
         expect(isKnownGeneration(WIFI_GENERATIONS.WIFI_4)).toBe(true);
         expect(isKnownGeneration(WIFI_GENERATIONS.WIFI_5)).toBe(true);
         expect(isKnownGeneration(WIFI_GENERATIONS.WIFI_6)).toBe(true);
@@ -226,8 +230,118 @@ describe('parseIwLinkOutput', () => {
     });
 });
 
+describe('legacy WiFi detection', () => {
+    describe('WiFi 2 (802.11a) - 5 GHz legacy', () => {
+        it('should detect WiFi 2 for 5 GHz without generation markers', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	SSID: LegacyNetwork
+	freq: 5180
+	signal: -60 dBm
+	tx bitrate: 54.0 MBit/s
+	rx bitrate: 48.0 MBit/s`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.WIFI_2);
+            expect(result.standard).toBe('802.11a');
+        });
+    });
+
+    describe('WiFi 1 (802.11b) - 2.4 GHz low bitrate', () => {
+        it('should detect WiFi 1 for 2.4 GHz with bitrate <= 11 Mbps', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	SSID: VeryOldNetwork
+	freq: 2437
+	signal: -70 dBm
+	tx bitrate: 11.0 MBit/s
+	rx bitrate: 5.5 MBit/s`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.WIFI_1);
+            expect(result.standard).toBe('802.11b');
+        });
+
+        it('should detect WiFi 1 for 2.4 GHz with 1 Mbps bitrate', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	freq: 2412
+	signal: -80 dBm
+	tx bitrate: 1.0 MBit/s`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.WIFI_1);
+        });
+    });
+
+    describe('WiFi 3 (802.11g) - 2.4 GHz high bitrate', () => {
+        it('should detect WiFi 3 for 2.4 GHz with bitrate > 11 Mbps', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	SSID: OlderNetwork
+	freq: 2437
+	signal: -55 dBm
+	tx bitrate: 54.0 MBit/s
+	rx bitrate: 36.0 MBit/s`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.WIFI_3);
+            expect(result.standard).toBe('802.11g');
+        });
+
+        it('should detect WiFi 3 for 2.4 GHz with 12 Mbps bitrate', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	freq: 2462
+	signal: -65 dBm
+	tx bitrate: 12.0 MBit/s`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.WIFI_3);
+        });
+    });
+
+    describe('no legacy detection when generation already known', () => {
+        it('should not override WiFi 4 detection with legacy', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	freq: 2437
+	signal: -65 dBm
+	tx bitrate: 72.2 MBit/s MCS 7 20MHz short GI`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.WIFI_4);
+        });
+    });
+
+    describe('no legacy detection without enough info', () => {
+        it('should remain UNKNOWN without frequency', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	signal: -65 dBm
+	tx bitrate: 54.0 MBit/s`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.UNKNOWN);
+        });
+
+        it('should remain UNKNOWN without bitrate on 2.4 GHz', () => {
+            const iwOutput = `Connected to aa:bb:cc:dd:ee:ff (on wlan0)
+	freq: 2437
+	signal: -65 dBm`;
+
+            const result = parseIwLinkOutput(iwOutput);
+
+            expect(result.generation).toBe(WIFI_GENERATIONS.UNKNOWN);
+        });
+    });
+});
+
 describe('getGenerationLabel', () => {
     it('should return "WiFi X" for known generations', () => {
+        expect(getGenerationLabel(WIFI_GENERATIONS.WIFI_1)).toBe('WiFi 1');
+        expect(getGenerationLabel(WIFI_GENERATIONS.WIFI_2)).toBe('WiFi 2');
+        expect(getGenerationLabel(WIFI_GENERATIONS.WIFI_3)).toBe('WiFi 3');
         expect(getGenerationLabel(WIFI_GENERATIONS.WIFI_4)).toBe('WiFi 4');
         expect(getGenerationLabel(WIFI_GENERATIONS.WIFI_5)).toBe('WiFi 5');
         expect(getGenerationLabel(WIFI_GENERATIONS.WIFI_6)).toBe('WiFi 6');
@@ -241,6 +355,9 @@ describe('getGenerationLabel', () => {
 
 describe('getGenerationDescription', () => {
     it('should return full description with IEEE standard', () => {
+        expect(getGenerationDescription(WIFI_GENERATIONS.WIFI_1)).toBe('WiFi 1 (802.11b)');
+        expect(getGenerationDescription(WIFI_GENERATIONS.WIFI_2)).toBe('WiFi 2 (802.11a)');
+        expect(getGenerationDescription(WIFI_GENERATIONS.WIFI_3)).toBe('WiFi 3 (802.11g)');
         expect(getGenerationDescription(WIFI_GENERATIONS.WIFI_4)).toBe('WiFi 4 (802.11n)');
         expect(getGenerationDescription(WIFI_GENERATIONS.WIFI_5)).toBe('WiFi 5 (802.11ac)');
         expect(getGenerationDescription(WIFI_GENERATIONS.WIFI_6)).toBe('WiFi 6 (802.11ax)');
@@ -252,8 +369,30 @@ describe('getGenerationDescription', () => {
     });
 });
 
+describe('getGenerationIconFilename', () => {
+    it('should return PNG filename for WiFi 4-7', () => {
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_4)).toBe('wifi-4.png');
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_5)).toBe('wifi-5.png');
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_6)).toBe('wifi-6.png');
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_7)).toBe('wifi-7.png');
+    });
+
+    it('should return SVG filename for WiFi 1-3', () => {
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_1)).toBe('wifi-1.svg');
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_2)).toBe('wifi-2.svg');
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.WIFI_3)).toBe('wifi-3.svg');
+    });
+
+    it('should return null for UNKNOWN', () => {
+        expect(getGenerationIconFilename(WIFI_GENERATIONS.UNKNOWN)).toBeNull();
+    });
+});
+
 describe('IEEE_STANDARDS', () => {
     it('should map all generations to their IEEE standards', () => {
+        expect(IEEE_STANDARDS[WIFI_GENERATIONS.WIFI_1]).toBe('802.11b');
+        expect(IEEE_STANDARDS[WIFI_GENERATIONS.WIFI_2]).toBe('802.11a');
+        expect(IEEE_STANDARDS[WIFI_GENERATIONS.WIFI_3]).toBe('802.11g');
         expect(IEEE_STANDARDS[WIFI_GENERATIONS.WIFI_4]).toBe('802.11n');
         expect(IEEE_STANDARDS[WIFI_GENERATIONS.WIFI_5]).toBe('802.11ac');
         expect(IEEE_STANDARDS[WIFI_GENERATIONS.WIFI_6]).toBe('802.11ax');
@@ -264,6 +403,9 @@ describe('IEEE_STANDARDS', () => {
 
 describe('GENERATION_CSS_CLASSES', () => {
     it('should map all generations to CSS classes', () => {
+        expect(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.WIFI_1]).toBe('wifi-gen-1');
+        expect(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.WIFI_2]).toBe('wifi-gen-2');
+        expect(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.WIFI_3]).toBe('wifi-gen-3');
         expect(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.WIFI_4]).toBe('wifi-gen-4');
         expect(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.WIFI_5]).toBe('wifi-gen-5');
         expect(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.WIFI_6]).toBe('wifi-gen-6');
@@ -272,8 +414,10 @@ describe('GENERATION_CSS_CLASSES', () => {
     });
 
     it('should use template literal type pattern', () => {
-        // Type check: all values should match the GenerationCssClass type
         const classes = Object.values(GENERATION_CSS_CLASSES);
+        expect(classes).toContain('wifi-gen-1');
+        expect(classes).toContain('wifi-gen-2');
+        expect(classes).toContain('wifi-gen-3');
         expect(classes).toContain('wifi-gen-4');
         expect(classes).toContain('wifi-gen-5');
         expect(classes).toContain('wifi-gen-6');
