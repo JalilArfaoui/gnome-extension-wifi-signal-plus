@@ -4,10 +4,11 @@
   "description": "GNOME Shell extension displaying WiFi generation (4/5/6/7) with detailed info",
   "type": "module",
   "scripts": {
-    "build": "tsc && npm run copy-assets",
+    "build": "tsc -p tsconfig.build.json && npm run copy-assets",
     "copy-assets": "cp metadata.json stylesheet.css dist/ && cp -r src/icons dist/",
     "install-extension": "npm run build && rm -rf ~/.local/share/gnome-shell/extensions/wifi-signal-plus@music-music.music && cp -r dist ~/.local/share/gnome-shell/extensions/wifi-signal-plus@music-music.music",
     "nested": "npm run install-extension && MUTTER_DEBUG_DUMMY_MODE_SPECS=1920x1080 dbus-run-session gnome-shell --devkit --wayland",
+    "reload": "npm run install-extension && gnome-extensions disable wifi-signal-plus@music-music.music 2>/dev/null; gnome-extensions enable wifi-signal-plus@music-music.music",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
