@@ -103,6 +103,7 @@ export default class WifiSignalPlusExtension extends Extension {
         this.wifiService
             .init()
             .then(() => {
+                if (!this.wifiService) return;
                 this.createIndicator();
                 this.refresh();
                 this.startRefreshTimer();
