@@ -10,6 +10,7 @@
     "nested": "npm run install-extension && MUTTER_DEBUG_DUMMY_MODE_SPECS=1920x1080 dbus-run-session gnome-shell --devkit --wayland",
     "reload": "npm run install-extension && gnome-extensions disable wifi-signal-plus@jalil.arfaoui.net 2>/dev/null; gnome-extensions enable wifi-signal-plus@jalil.arfaoui.net",
     "watch": "tsc --watch",
+    "pack": "npm run build && cd dist && gnome-extensions pack --extra-source=icons --extra-source=wifiInfo.js --extra-source=wifiGeneration.js --extra-source=types.js --force --out-dir=..",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
