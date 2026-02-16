@@ -314,10 +314,10 @@ export default class WifiSignalPlusExtension extends Extension {
         }
     }
 
-    private refresh(): void {
+    private async refresh(): Promise<void> {
         if (!this.wifiService || !this.label) return;
 
-        const info = this.wifiService.getConnectionInfo();
+        const info = await this.wifiService.getConnectionInfo();
         this.updateIndicatorLabel(info);
         this.updateMenuContent(info);
     }

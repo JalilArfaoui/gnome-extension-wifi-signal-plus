@@ -4,6 +4,7 @@
  * Retrieves connection details from NetworkManager and `iw` command.
  */
 
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import NM from 'gi://NM';
 
@@ -66,7 +67,7 @@ export class WifiInfoService {
         this.initPromise = null;
     }
 
-    getConnectionInfo(): WifiConnectionInfo {
+    async getConnectionInfo(): Promise<WifiConnectionInfo> {
         if (!this.client) {
             return createDisconnectedInfo();
         }
@@ -86,12 +87,12 @@ export class WifiInfoService {
         return this.buildConnectedInfo(wifiDevice, activeAp, interfaceName);
     }
 
-    private buildConnectedInfo(
+    private async buildConnectedInfo(
         device: NM.DeviceWifi,
         ap: NM.AccessPoint,
         interfaceName: string | null
-    ): ConnectedInfo {
-        const iwInfo = this.executeIwLink(interfaceName);
+    ): Promise<ConnectedInfo> {
+        const iwInfo = await this.executeIwLink(interfaceName);
         const frequency = asFrequencyMHz(ap.get_frequency());
         const strengthPercent = ap.get_strength();
 
@@ -138,15 +139,19 @@ export class WifiInfoService {
         return null;
     }
 
-    private executeIwLink(interfaceName: string | null) {
+    private async executeIwLink(interfaceName: string | null) {
         if (!interfaceName) {
             return createEmptyIwLinkInfo();
         }
 
         try {
-            const [success, stdout] = GLib.spawn_command_line_sync(`iw dev ${interfaceName} link`);
-            if (success && stdout) {
-                return parseIwLinkOutput(new TextDecoder().decode(stdout));
+            const proc = Gio.Subprocess.new(
+                ['iw', 'dev', interfaceName, 'link'],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+            );
+            const [stdout] = await proc.communicate_utf8_async(null, null);
+            if (proc.get_successful() && stdout) {
+                return parseIwLinkOutput(stdout);
             }
         } catch {
             // iw not available - graceful degradation
