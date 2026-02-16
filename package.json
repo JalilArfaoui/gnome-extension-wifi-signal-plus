@@ -4,7 +4,7 @@
   "description": "GNOME Shell extension displaying WiFi generation (4/5/6/7) with detailed info",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && npm run copy-assets",
+    "build": "tsc -p tsconfig.build.json && eslint --config eslint.dist.config.js --fix dist/ && npm run copy-assets",
     "copy-assets": "cp metadata.json stylesheet.css dist/ && cp -r src/icons dist/",
     "install-extension": "npm run build && rm -rf ~/.local/share/gnome-shell/extensions/wifi-signal-plus@jalil.arfaoui.net && cp -r dist ~/.local/share/gnome-shell/extensions/wifi-signal-plus@jalil.arfaoui.net",
     "nested": "npm run install-extension && MUTTER_DEBUG_DUMMY_MODE_SPECS=1920x1080 dbus-run-session gnome-shell --devkit --wayland",
@@ -21,16 +21,17 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@girs/gio-2.0": "2.86.0-4.0.0-beta.38",
     "@girs/gjs": "4.0.0-beta.38",
+    "@girs/glib-2.0": "2.86.0-4.0.0-beta.38",
     "@girs/gnome-shell": "^49.1.0",
     "@girs/nm-1.0": "1.49.4-4.0.0-beta.38",
-    "@girs/glib-2.0": "2.86.0-4.0.0-beta.38",
-    "@girs/gio-2.0": "2.86.0-4.0.0-beta.38",
-    "typescript": "^5.7.3",
+    "@stylistic/eslint-plugin": "^5.8.0",
     "eslint": "^9.19.0",
-    "@eslint/js": "^9.19.0",
-    "typescript-eslint": "^8.22.0",
     "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.22.0",
     "vitest": "^3.0.4"
   }
 }
