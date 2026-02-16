@@ -465,6 +465,7 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private startRefreshTimer(): void {
+        this.stopRefreshTimer();
         this.refreshTimeout = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             REFRESH_INTERVAL_SECONDS,
