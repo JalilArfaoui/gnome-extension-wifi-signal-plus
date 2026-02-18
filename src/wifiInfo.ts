@@ -8,8 +8,6 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import NM from 'gi://NM';
 
-Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async', 'communicate_utf8_finish');
-
 import { parseIwLinkOutput, createEmptyIwLinkInfo } from './wifiGeneration.js';
 import {
     type WifiConnectionInfo,
@@ -39,6 +37,8 @@ export {
     type SignalQuality,
     isConnected,
 };
+
+Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async', 'communicate_utf8_finish');
 
 const PLACEHOLDER = '--' as const;
 
