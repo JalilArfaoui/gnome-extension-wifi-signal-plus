@@ -142,8 +142,10 @@ export default class WifiSignalPlusExtension extends Extension {
             style_class: 'wifi-signal-plus-label',
         });
 
-        this.indicator.add_child(this.icon);
-        this.indicator.add_child(this.label);
+        const box = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
+        box.add_child(this.icon);
+        box.add_child(this.label);
+        this.indicator.add_child(box);
         this.buildMenu();
 
         Main.panel.addToStatusArea(this.uuid, this.indicator);
