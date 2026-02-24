@@ -21,7 +21,6 @@ import {
     type ConnectedInfo,
 } from './wifiInfo.js';
 import {
-    WIFI_GENERATIONS,
     GENERATION_CSS_CLASSES,
     getGenerationLabel,
     getGenerationDescription,
@@ -325,17 +324,16 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private updateIndicatorLabel(info: WifiConnectionInfo): void {
-        if (!this.icon || !this.label) return;
+        if (!this.indicator || !this.icon || !this.label) return;
 
         this.clearGenerationStyles();
 
         if (!isConnected(info)) {
-            this.icon.visible = false;
-            this.label.visible = true;
-            this.label.set_text('WiFi --');
-            this.label.add_style_class_name(GENERATION_CSS_CLASSES[WIFI_GENERATIONS.UNKNOWN]);
+            this.indicator.visible = false;
             return;
         }
+
+        this.indicator.visible = true;
 
         const iconFilename = getGenerationIconFilename(info.generation);
         if (iconFilename) {
