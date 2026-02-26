@@ -11,6 +11,7 @@ import St from 'gi://St';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {
@@ -92,6 +93,10 @@ const MENU_STRUCTURE: readonly MenuItemConfig[][] = [
 
 const ITEMS_WITH_BAR: ReadonlySet<MenuItemId> = new Set(['bitrate', 'channelWidth']);
 
+interface NearbyNetworkCard extends PopupMenu.PopupSubMenuMenuItem {
+    _ssid: string;
+}
+
 export default class WifiSignalPlusExtension extends Extension {
     private indicator: PanelMenu.Button | null = null;
     private icon: St.Icon | null = null;
@@ -110,7 +115,7 @@ export default class WifiSignalPlusExtension extends Extension {
     private headerBandLabel: St.Label | null = null;
     private headerIcon: St.Icon | null = null;
     private nearbySeparator: PopupMenu.PopupSeparatorMenuItem | null = null;
-    private nearbyItems: PopupMenu.PopupSubMenuMenuItem[] = [];
+    private nearbyItems: NearbyNetworkCard[] = [];
     private currentConnectedBssid: string | undefined;
     private isMenuOpen = false;
 
@@ -578,6 +583,12 @@ export default class WifiSignalPlusExtension extends Extension {
     private async updateNearbyNetworks(): Promise<void> {
         if (!this.wifiService || !this.indicator) return;
 
+        const expandedSsids = new Set(
+            this.nearbyItems
+                .filter(card => card.menu.isOpen)
+                .map(card => card._ssid),
+        );
+
         const menu = this.indicator.menu as PopupMenu.PopupMenu;
         this.clearNearbyItems();
 
@@ -587,6 +598,10 @@ export default class WifiSignalPlusExtension extends Extension {
             const card = this.createNetworkCard(ssid, networks[0], networks);
             menu.addMenuItem(card);
             this.nearbyItems.push(card);
+
+            if (expandedSsids.has(ssid)) {
+                card.menu.open(BoxPointer.PopupAnimation.NONE);
+            }
         }
     }
 
@@ -594,8 +609,9 @@ export default class WifiSignalPlusExtension extends Extension {
         ssid: string,
         bestAp: ScannedNetwork,
         allAps: ScannedNetwork[],
-    ): PopupMenu.PopupSubMenuMenuItem {
-        const card = new PopupMenu.PopupSubMenuMenuItem(ssid);
+    ): NearbyNetworkCard {
+        const card = new PopupMenu.PopupSubMenuMenuItem(ssid) as NearbyNetworkCard;
+        card._ssid = ssid;
         card.add_style_class_name('wifi-nearby-card');
 
         this.createCardHeader(card, ssid, bestAp, allAps.length);
