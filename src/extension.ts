@@ -235,14 +235,7 @@ export default class WifiSignalPlusExtension extends Extension {
         menu.addMenuItem(this.nearbySeparator);
 
         this.nearbySection = new PopupMenu.PopupMenuSection();
-        const scrollView = new St.ScrollView({
-            style_class: 'wifi-nearby-scroll',
-            overlay_scrollbars: true,
-        });
-        scrollView.add_child(this.nearbySection.actor);
-        const scrollItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        scrollItem.add_child(scrollView);
-        menu.addMenuItem(scrollItem);
+        menu.addMenuItem(this.nearbySection);
     }
 
     private addConnectionHeader(menu: PopupMenu.PopupMenu): void {
