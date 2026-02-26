@@ -63,9 +63,6 @@ const SIGNAL_QUALITY_BAR_COLORS: Readonly<Record<string, string>> = {
 };
 
 type MenuItemId =
-    | 'ssid'
-    | 'generation'
-    | 'band'
     | 'bitrate'
     | 'channelWidth'
     | 'mcs'
@@ -79,12 +76,6 @@ interface MenuItemConfig {
 }
 
 const MENU_STRUCTURE: readonly MenuItemConfig[][] = [
-    // Section: Connection
-    [
-        { id: 'ssid', label: 'Network' },
-        { id: 'generation', label: 'Generation' },
-        { id: 'band', label: 'Band' },
-    ],
     // Section: Performance
     [
         { id: 'bitrate', label: 'Speed' },
@@ -114,6 +105,10 @@ export default class WifiSignalPlusExtension extends Extension {
         MenuItemId,
         { item: PopupMenu.PopupBaseMenuItem; label: St.Label; value: St.Label; barFill?: St.Widget }
     >();
+    private headerSsidLabel: St.Label | null = null;
+    private headerGenerationLabel: St.Label | null = null;
+    private headerBandLabel: St.Label | null = null;
+    private headerIcon: St.Icon | null = null;
     private nearbySeparator: PopupMenu.PopupSeparatorMenuItem | null = null;
     private nearbyItems: PopupMenu.PopupSubMenuMenuItem[] = [];
     private currentConnectedBssid: string | undefined;
@@ -155,6 +150,10 @@ export default class WifiSignalPlusExtension extends Extension {
         this.signalGraph = null;
         this.signalHistory.length = 0;
         this.menuItems.clear();
+        this.headerSsidLabel = null;
+        this.headerGenerationLabel = null;
+        this.headerBandLabel = null;
+        this.headerIcon = null;
         this.nearbySeparator = null;
         this.nearbyItems = [];
         this.currentConnectedBssid = undefined;
@@ -201,14 +200,14 @@ export default class WifiSignalPlusExtension extends Extension {
             return undefined;
         });
 
-        const sectionHeaders = ['', 'Performance', 'Signal'];
+        this.addConnectionHeader(menu);
 
-        const SIGNAL_SECTION_INDEX = 2;
+        const sectionHeaders = ['Performance', 'Signal'];
+
+        const SIGNAL_SECTION_INDEX = 1;
 
         MENU_STRUCTURE.forEach((section, index) => {
-            if (sectionHeaders[index]) {
-                menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(sectionHeaders[index]));
-            }
+            menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(sectionHeaders[index]));
 
             if (index === SIGNAL_SECTION_INDEX) {
                 this.addSignalGraph(menu);
@@ -221,6 +220,47 @@ export default class WifiSignalPlusExtension extends Extension {
 
         this.nearbySeparator = new PopupMenu.PopupSeparatorMenuItem('Nearby Networks');
         menu.addMenuItem(this.nearbySeparator);
+    }
+
+    private addConnectionHeader(menu: PopupMenu.PopupMenu): void {
+        const item = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        item.add_style_class_name('wifi-connection-header');
+
+        const leftBox = new St.BoxLayout({
+            vertical: true,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        this.headerSsidLabel = new St.Label({
+            text: PLACEHOLDER,
+            style_class: 'wifi-connection-header-ssid',
+        });
+        leftBox.add_child(this.headerSsidLabel);
+
+        this.headerGenerationLabel = new St.Label({
+            text: PLACEHOLDER,
+            style_class: 'wifi-connection-header-generation',
+        });
+        leftBox.add_child(this.headerGenerationLabel);
+
+        this.headerBandLabel = new St.Label({
+            text: PLACEHOLDER,
+            style_class: 'wifi-connection-header-band',
+        });
+        leftBox.add_child(this.headerBandLabel);
+
+        item.add_child(leftBox);
+
+        this.headerIcon = new St.Icon({
+            icon_size: 48,
+            style_class: 'wifi-connection-header-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+            visible: false,
+        });
+        item.add_child(this.headerIcon);
+
+        menu.addMenuItem(item);
     }
 
     private addMenuItem(
@@ -359,6 +399,21 @@ export default class WifiSignalPlusExtension extends Extension {
         }
     }
 
+    private updateHeaderIcon(generation: WifiGeneration): void {
+        if (!this.headerIcon) return;
+
+        const iconFilename = getGenerationIconFilename(generation);
+        if (!iconFilename) {
+            this.headerIcon.visible = false;
+            return;
+        }
+
+        const iconPath = GLib.build_filenamev([this.path, 'icons', iconFilename]);
+        const file = Gio.File.new_for_path(iconPath);
+        this.headerIcon.gicon = new Gio.FileIcon({ file });
+        this.headerIcon.visible = true;
+    }
+
     private async refresh(): Promise<void> {
         if (!this.wifiService || !this.label) return;
 
@@ -419,10 +474,16 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private showDisconnectedState(): void {
+        this.headerSsidLabel?.set_text('Not connected');
+        this.headerGenerationLabel?.set_text('');
+        this.headerBandLabel?.set_text('');
+        if (this.headerIcon) {
+            this.headerIcon.visible = false;
+        }
+
         for (const section of MENU_STRUCTURE) {
             for (const { id } of section) {
-                const value = id === 'ssid' ? 'Not connected' : PLACEHOLDER;
-                this.updateMenuItem(id, value, 0);
+                this.updateMenuItem(id, PLACEHOLDER, 0);
             }
         }
 
@@ -431,9 +492,10 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private showConnectedState(info: ConnectedInfo): void {
-        this.updateMenuItem('ssid', info.ssid);
-        this.updateMenuItem('generation', getGenerationDescription(info.generation));
-        this.updateMenuItem('band', this.formatBand(info));
+        this.headerSsidLabel?.set_text(info.ssid);
+        this.headerGenerationLabel?.set_text(getGenerationDescription(info.generation));
+        this.headerBandLabel?.set_text(this.formatBand(info));
+        this.updateHeaderIcon(info.generation);
         this.updateMenuItem(
             'bitrate',
             this.formatBitrate(info),

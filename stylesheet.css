@@ -72,6 +72,30 @@
     color: rgba(255, 255, 255, 0.7);
 }
 
+/* Connection header */
+.wifi-connection-header {
+    padding: 4px 8px;
+}
+
+.wifi-connection-header-ssid {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.wifi-connection-header-generation {
+    font-size: 0.95em;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.wifi-connection-header-band {
+    font-size: 0.9em;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.wifi-connection-header-icon {
+    margin-left: 12px;
+}
+
 .wifi-popup-value {
     font-size: 1em;
     font-weight: 500;
