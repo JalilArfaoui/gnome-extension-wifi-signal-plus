@@ -115,7 +115,9 @@ export default class WifiSignalPlusExtension extends Extension {
     private headerBandLabel: St.Label | null = null;
     private headerIcon: St.Icon | null = null;
     private nearbySeparator: PopupMenu.PopupSeparatorMenuItem | null = null;
+    private nearbySection: PopupMenu.PopupMenuSection | null = null;
     private nearbyItems: NearbyNetworkCard[] = [];
+    private nearbyUpdatePending = false;
     private currentConnectedBssid: string | undefined;
     private isMenuOpen = false;
 
@@ -160,7 +162,9 @@ export default class WifiSignalPlusExtension extends Extension {
         this.headerBandLabel = null;
         this.headerIcon = null;
         this.nearbySeparator = null;
+        this.nearbySection = null;
         this.nearbyItems = [];
+        this.nearbyUpdatePending = false;
         this.currentConnectedBssid = undefined;
         this.isMenuOpen = false;
     }
@@ -225,6 +229,16 @@ export default class WifiSignalPlusExtension extends Extension {
 
         this.nearbySeparator = new PopupMenu.PopupSeparatorMenuItem('Nearby Networks');
         menu.addMenuItem(this.nearbySeparator);
+
+        this.nearbySection = new PopupMenu.PopupMenuSection();
+        const scrollView = new St.ScrollView({
+            style_class: 'wifi-nearby-scroll',
+            overlay_scrollbars: true,
+        });
+        scrollView.add_child(this.nearbySection.actor);
+        const scrollItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        scrollItem.add_child(scrollView);
+        menu.addMenuItem(scrollItem);
     }
 
     private addConnectionHeader(menu: PopupMenu.PopupMenu): void {
@@ -581,7 +595,15 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private async updateNearbyNetworks(): Promise<void> {
-        if (!this.wifiService || !this.indicator) return;
+        if (!this.wifiService || !this.nearbySection || this.nearbyUpdatePending) return;
+
+        this.nearbyUpdatePending = true;
+        let grouped: Map<string, ScannedNetwork[]>;
+        try {
+            grouped = await this.wifiService.getAvailableNetworks(this.currentConnectedBssid);
+        } finally {
+            this.nearbyUpdatePending = false;
+        }
 
         const expandedSsids = new Set(
             this.nearbyItems
@@ -589,14 +611,11 @@ export default class WifiSignalPlusExtension extends Extension {
                 .map(card => card._ssid),
         );
 
-        const menu = this.indicator.menu as PopupMenu.PopupMenu;
         this.clearNearbyItems();
-
-        const grouped = await this.wifiService.getAvailableNetworks(this.currentConnectedBssid);
 
         for (const [ssid, networks] of grouped) {
             const card = this.createNetworkCard(ssid, networks[0], networks);
-            menu.addMenuItem(card);
+            this.nearbySection.addMenuItem(card);
             this.nearbyItems.push(card);
 
             if (expandedSsids.has(ssid)) {

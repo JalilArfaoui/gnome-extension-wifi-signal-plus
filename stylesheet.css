@@ -143,6 +143,11 @@
     color: #e01b24;
 }
 
+/* Nearby networks - Scroll container */
+.wifi-nearby-scroll {
+    max-height: 250px;
+}
+
 /* Nearby networks - Card header */
 .wifi-nearby-card {
     margin: 2px 0;
