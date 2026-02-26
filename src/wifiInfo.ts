@@ -139,7 +139,7 @@ export class WifiInfoService {
         });
     }
 
-    async getAvailableNetworks(excludeBssid?: string): Promise<Map<string, ScannedNetwork[]>> {
+    async getAvailableNetworks(excludeSsid?: string): Promise<Map<string, ScannedNetwork[]>> {
         if (!this.client) return new Map();
 
         const wifiDevice = this.findWifiDevice();
@@ -155,10 +155,10 @@ export class WifiInfoService {
 
             const ssid = this.decodeSsid(ap.get_ssid());
             if (!ssid) continue;
+            if (excludeSsid && ssid === excludeSsid) continue;
 
             const bssid = (ap.get_bssid() ?? '').toLowerCase();
             if (!bssid) continue;
-            if (excludeBssid && bssid === excludeBssid.toLowerCase()) continue;
 
             const frequency = asFrequencyMHz(ap.get_frequency());
             const generation = this.generationMap.get(bssid) ?? WIFI_GENERATIONS.UNKNOWN;

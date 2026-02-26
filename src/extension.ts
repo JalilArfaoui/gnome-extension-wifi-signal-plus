@@ -118,7 +118,7 @@ export default class WifiSignalPlusExtension extends Extension {
     private nearbySection: PopupMenu.PopupMenuSection | null = null;
     private nearbyItems: NearbyNetworkCard[] = [];
     private nearbyUpdatePending = false;
-    private currentConnectedBssid: string | undefined;
+    private currentConnectedSsid: string | undefined;
     private isMenuOpen = false;
     private enableEpoch = 0;
 
@@ -169,7 +169,7 @@ export default class WifiSignalPlusExtension extends Extension {
         this.nearbyItems = [];
         this.refreshPending = false;
         this.nearbyUpdatePending = false;
-        this.currentConnectedBssid = undefined;
+        this.currentConnectedSsid = undefined;
         this.isMenuOpen = false;
     }
 
@@ -453,7 +453,7 @@ export default class WifiSignalPlusExtension extends Extension {
             const info = await this.wifiService.getConnectionInfo();
             if (!this.wifiService) return;
 
-            this.currentConnectedBssid = isConnected(info) ? info.bssid : undefined;
+            this.currentConnectedSsid = isConnected(info) ? info.ssid : undefined;
             this.updateIndicatorLabel(info);
             this.updateMenuContent(info);
 
@@ -619,7 +619,7 @@ export default class WifiSignalPlusExtension extends Extension {
         this.nearbyUpdatePending = true;
         let grouped: Map<string, ScannedNetwork[]>;
         try {
-            grouped = await this.wifiService.getAvailableNetworks(this.currentConnectedBssid);
+            grouped = await this.wifiService.getAvailableNetworks(this.currentConnectedSsid);
         } finally {
             this.nearbyUpdatePending = false;
         }
