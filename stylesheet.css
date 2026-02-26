@@ -118,3 +118,66 @@
 .wifi-signal-poor {
     color: #e01b24;
 }
+
+/* Nearby networks - Card header */
+.wifi-nearby-card {
+    margin: 2px 0;
+}
+
+.wifi-nearby-card-header {
+    spacing: 8px;
+}
+
+.wifi-nearby-card-icon {
+    icon-size: 16px;
+}
+
+.wifi-nearby-card-ssid {
+    font-weight: 500;
+}
+
+.wifi-nearby-card-signal {
+    font-weight: bold;
+    font-size: 0.9em;
+    min-width: 3em;
+}
+
+.wifi-nearby-card-count {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Nearby networks - Badges */
+.wifi-nearby-badge {
+    font-size: 0.8em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.wifi-nearby-badge-open {
+    background-color: rgba(224, 27, 36, 0.3);
+    color: #e01b24;
+}
+
+/* Nearby networks - AP sub-rows */
+.wifi-nearby-ap {
+    min-height: 0;
+    padding: 3px 8px 3px 30px;
+}
+
+.wifi-nearby-ap-bssid {
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.5);
+    min-width: 10em;
+}
+
+.wifi-nearby-ap-details {
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.wifi-nearby-ap-signal {
+    font-weight: bold;
+    font-size: 0.85em;
+}

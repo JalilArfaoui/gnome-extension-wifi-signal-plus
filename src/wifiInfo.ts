@@ -6,13 +6,15 @@
 
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import NM from 'gi://NM';
 
-import { parseIwLinkOutput, createEmptyIwLinkInfo } from './wifiGeneration.js';
+import { parseIwLinkOutput, parseIwScanDump, createEmptyIwLinkInfo, WIFI_GENERATIONS } from './wifiGeneration.js';
 import {
     type WifiConnectionInfo,
     type ConnectedInfo,
     type DisconnectedInfo,
+    type ScannedNetwork,
     type FrequencyMHz,
     type FrequencyBand,
     type ChannelNumber,
@@ -20,6 +22,8 @@ import {
     type SignalQuality,
     type SecurityProtocol,
     type SignalCssClass,
+    type ChannelWidthMHz,
+    type WifiGeneration,
     SIGNAL_THRESHOLDS,
     createDisconnectedInfo,
     isConnected,
@@ -28,23 +32,29 @@ import {
     asSignalPercent,
     asBitrateMbps,
     asChannelNumber,
+    asChannelWidthMHz,
 } from './types.js';
 
 export {
     type WifiConnectionInfo,
     type ConnectedInfo,
     type DisconnectedInfo,
+    type ScannedNetwork,
     type SignalQuality,
     isConnected,
 };
 
 Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async', 'communicate_utf8_finish');
+Gio._promisify(NM.DeviceWifi.prototype, 'request_scan_async', 'request_scan_finish');
 
 const PLACEHOLDER = '--' as const;
 
 export class WifiInfoService {
     private client: NM.Client | null = null;
     private initPromise: Promise<void> | null = null;
+    private watchedDevice: NM.DeviceWifi | null = null;
+    private deviceSignalIds: number[] = [];
+    private generationMap = new Map<string, WifiGeneration>();
 
     async init(): Promise<void> {
         if (this.client) return;
@@ -65,8 +75,34 @@ export class WifiInfoService {
     }
 
     destroy(): void {
+        this.unwatchDeviceSignals();
         this.client = null;
         this.initPromise = null;
+        this.generationMap.clear();
+    }
+
+    watchDeviceSignals(callback: () => void): void {
+        this.unwatchDeviceSignals();
+
+        const device = this.findWifiDevice();
+        if (!device) return;
+
+        this.watchedDevice = device;
+        this.deviceSignalIds = [
+            device.connect('state-changed', () => callback()),
+            device.connect('notify::active-access-point', () => callback()),
+            device.connect('notify::last-scan', () => this.onScanCompleted()),
+        ];
+    }
+
+    unwatchDeviceSignals(): void {
+        if (this.watchedDevice) {
+            for (const id of this.deviceSignalIds) {
+                GObject.signal_handler_disconnect(this.watchedDevice, id);
+            }
+        }
+        this.watchedDevice = null;
+        this.deviceSignalIds = [];
     }
 
     async getConnectionInfo(): Promise<WifiConnectionInfo> {
@@ -74,12 +110,17 @@ export class WifiInfoService {
             return createDisconnectedInfo();
         }
 
-        const wifiDevice = this.findActiveWifiDevice();
+        const wifiDevice = this.findWifiDevice();
         if (!wifiDevice) {
             return createDisconnectedInfo();
         }
 
         const interfaceName = wifiDevice.get_iface();
+
+        if (wifiDevice.get_state() !== NM.DeviceState.ACTIVATED) {
+            return createDisconnectedInfo(interfaceName);
+        }
+
         const activeAp = wifiDevice.get_active_access_point();
 
         if (!activeAp) {
@@ -87,6 +128,104 @@ export class WifiInfoService {
         }
 
         return this.buildConnectedInfo(wifiDevice, activeAp, interfaceName);
+    }
+
+    requestScan(): void {
+        const device = this.findWifiDevice();
+        if (!device) return;
+
+        device.request_scan_async(null).catch(() => {
+            // Rate-limited or permission denied - use cached results
+        });
+    }
+
+    async getAvailableNetworks(excludeBssid?: string): Promise<Map<string, ScannedNetwork[]>> {
+        if (!this.client) return new Map();
+
+        const wifiDevice = this.findWifiDevice();
+        if (!wifiDevice) return new Map();
+
+        const accessPoints = wifiDevice.get_access_points();
+        const lastScanSec = wifiDevice.get_last_scan() / 1000;
+
+        const networks: ScannedNetwork[] = [];
+
+        for (const ap of accessPoints) {
+            if (isStaleAccessPoint(ap, lastScanSec)) continue;
+
+            const ssid = this.decodeSsid(ap.get_ssid());
+            if (!ssid) continue;
+
+            const bssid = (ap.get_bssid() ?? '').toLowerCase();
+            if (!bssid) continue;
+            if (excludeBssid && bssid === excludeBssid.toLowerCase()) continue;
+
+            const frequency = asFrequencyMHz(ap.get_frequency());
+            const generation = this.generationMap.get(bssid) ?? WIFI_GENERATIONS.UNKNOWN;
+
+            networks.push(Object.freeze({
+                ssid,
+                bssid,
+                frequency,
+                channel: frequencyToChannel(frequency),
+                band: frequencyToBand(frequency),
+                bandwidth: getApBandwidth(ap),
+                maxBitrate: asBitrateMbps(ap.get_max_bitrate() / 1000),
+                signalPercent: asSignalPercent(ap.get_strength()),
+                security: getSecurityProtocol(ap),
+                generation,
+            }));
+        }
+
+        return groupBySSID(sortBySignalStrength(networks));
+    }
+
+    private findWifiDevice(): NM.DeviceWifi | null {
+        if (!this.client) return null;
+
+        const devices = this.client.get_devices();
+
+        for (const device of devices) {
+            if (device instanceof NM.DeviceWifi && device.get_state() === NM.DeviceState.ACTIVATED) {
+                return device;
+            }
+        }
+
+        for (const device of devices) {
+            if (device instanceof NM.DeviceWifi) {
+                return device;
+            }
+        }
+
+        return null;
+    }
+
+    private onScanCompleted(): void {
+        const device = this.findWifiDevice();
+        if (!device) return;
+
+        const interfaceName = device.get_iface();
+        if (!interfaceName) return;
+
+        this.executeIwScanDump(interfaceName);
+    }
+
+    private async executeIwScanDump(interfaceName: string): Promise<void> {
+        try {
+            const proc = Gio.Subprocess.new(
+                ['iw', 'dev', interfaceName, 'scan', 'dump'],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+            );
+            const [stdout] = await proc.communicate_utf8_async(null, null);
+            if (proc.get_successful() && stdout) {
+                const freshMap = parseIwScanDump(stdout);
+                if (freshMap.size > 0) {
+                    this.generationMap = freshMap;
+                }
+            }
+        } catch {
+            // iw scan dump not available or insufficient permissions - graceful degradation
+        }
     }
 
     private async buildConnectedInfo(
@@ -119,26 +258,6 @@ export class WifiInfoService {
             txBitrate: iwInfo.txBitrate,
             rxBitrate: iwInfo.rxBitrate,
         });
-    }
-
-    private findActiveWifiDevice(): NM.DeviceWifi | null {
-        if (!this.client) return null;
-
-        const devices = this.client.get_devices();
-
-        for (const device of devices) {
-            if (device instanceof NM.DeviceWifi && device.get_state() === NM.DeviceState.ACTIVATED) {
-                return device;
-            }
-        }
-
-        for (const device of devices) {
-            if (device instanceof NM.DeviceWifi) {
-                return device;
-            }
-        }
-
-        return null;
     }
 
     private async executeIwLink(interfaceName: string | null) {
@@ -275,4 +394,43 @@ export function getSignalCssClass(signalStrength: SignalDbm | null): SignalCssCl
 export function formatValue<T>(value: T | null, formatter?: (v: T) => string): string {
     if (value === null) return PLACEHOLDER;
     return formatter ? formatter(value) : String(value);
+}
+
+export function sortBySignalStrength(networks: ScannedNetwork[]): ScannedNetwork[] {
+    return [...networks].sort(
+        (a, b) => (b.signalPercent as number) - (a.signalPercent as number),
+    );
+}
+
+export function groupBySSID(networks: ScannedNetwork[]): Map<string, ScannedNetwork[]> {
+    const groups = new Map<string, ScannedNetwork[]>();
+
+    for (const network of networks) {
+        const existing = groups.get(network.ssid);
+        if (existing) {
+            existing.push(network);
+        } else {
+            groups.set(network.ssid, [network]);
+        }
+    }
+
+    return groups;
+}
+
+const STALE_AP_TOLERANCE_SECONDS = 10;
+
+function isStaleAccessPoint(ap: NM.AccessPoint, lastScanSec: number): boolean {
+    if (lastScanSec <= 0) return false;
+
+    const lastSeen = ap.get_last_seen();
+    if (lastSeen === -1) return true;
+
+    return lastSeen < lastScanSec - STALE_AP_TOLERANCE_SECONDS;
+}
+
+const DEFAULT_BANDWIDTH_MHZ = 20;
+
+function getApBandwidth(ap: NM.AccessPoint): ChannelWidthMHz {
+    const bandwidth = (ap as unknown as { get_bandwidth?: () => number }).get_bandwidth?.();
+    return asChannelWidthMHz(bandwidth && bandwidth > 0 ? bandwidth : DEFAULT_BANDWIDTH_MHZ);
 }

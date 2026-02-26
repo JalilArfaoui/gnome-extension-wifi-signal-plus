@@ -300,6 +300,31 @@ function parseHeGuardInterval(line: string, prefix: string): GuardIntervalUs {
     return HE_GI_INDEX_MAP[giIndex] ?? GUARD_INTERVALS.NORMAL;
 }
 
+export function parseIwScanDump(output: string): Map<string, WifiGeneration> {
+    const result = new Map<string, WifiGeneration>();
+    if (!output) return result;
+
+    const bssBlocks = output.split(/^BSS /m);
+
+    for (const block of bssBlocks) {
+        const bssidMatch = block.match(/^([0-9a-f:]{17})/i);
+        if (!bssidMatch) continue;
+
+        const bssid = bssidMatch[1].toLowerCase();
+        result.set(bssid, detectScanGeneration(block));
+    }
+
+    return result;
+}
+
+function detectScanGeneration(block: string): WifiGeneration {
+    if (block.includes('EHT capabilities')) return WIFI_GENERATIONS.WIFI_7;
+    if (block.includes('HE capabilities')) return WIFI_GENERATIONS.WIFI_6;
+    if (block.includes('VHT capabilities') || block.includes('VHT operation')) return WIFI_GENERATIONS.WIFI_5;
+    if (block.includes('HT capabilities') || block.includes('HT operation')) return WIFI_GENERATIONS.WIFI_4;
+    return WIFI_GENERATIONS.UNKNOWN;
+}
+
 export function getGenerationLabel(generation: WifiGeneration): string {
     return isKnownGeneration(generation) ? `WiFi ${generation}` : 'WiFi';
 }

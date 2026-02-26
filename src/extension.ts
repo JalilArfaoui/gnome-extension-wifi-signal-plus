@@ -19,6 +19,7 @@ import {
     isConnected,
     type WifiConnectionInfo,
     type ConnectedInfo,
+    type ScannedNetwork,
 } from './wifiInfo.js';
 import {
     GENERATION_CSS_CLASSES,
@@ -26,9 +27,17 @@ import {
     getGenerationDescription,
     getGenerationIconFilename,
 } from './wifiGeneration.js';
-import type { GenerationCssClass, ChannelWidthMHz, SignalDbm } from './types.js';
+import {
+    getSignalQualityFromPercent,
+    type GenerationCssClass,
+    type ChannelWidthMHz,
+    type SignalDbm,
+    type FrequencyBand,
+    type WifiGeneration,
+} from './types.js';
 
 const REFRESH_INTERVAL_SECONDS = 5;
+const BACKGROUND_SCAN_INTERVAL_SECONDS = 300;
 const PLACEHOLDER = '--' as const;
 // WiFi 7 theoretical max: 320 MHz, MCS 13 (4096-QAM 5/6), 4×4 MIMO, GI 0.8µs
 const MAX_SPEED_MBPS = 5760;
@@ -43,6 +52,14 @@ const SIGNAL_QUALITY_COLORS: Readonly<Record<string, [number, number, number]>> 
     Fair: [0.96, 0.83, 0.18],
     Weak: [1.0, 0.47, 0.0],
     Poor: [0.88, 0.11, 0.14],
+};
+
+const SIGNAL_QUALITY_BAR_COLORS: Readonly<Record<string, string>> = {
+    Excellent: '#33d17a',
+    Good: '#8ff0a4',
+    Fair: '#f6d32d',
+    Weak: '#ff7800',
+    Poor: '#e01b24',
 };
 
 type MenuItemId =
@@ -90,12 +107,17 @@ export default class WifiSignalPlusExtension extends Extension {
     private label: St.Label | null = null;
     private wifiService: WifiInfoService | null = null;
     private refreshTimeout: number | null = null;
+    private backgroundScanTimeout: number | null = null;
     private signalGraph: St.DrawingArea | null = null;
     private readonly signalHistory: number[] = [];
     private readonly menuItems = new Map<
         MenuItemId,
         { item: PopupMenu.PopupBaseMenuItem; label: St.Label; value: St.Label; barFill?: St.Widget }
     >();
+    private nearbySeparator: PopupMenu.PopupSeparatorMenuItem | null = null;
+    private nearbyItems: PopupMenu.PopupSubMenuMenuItem[] = [];
+    private currentConnectedBssid: string | undefined;
+    private isMenuOpen = false;
 
     enable(): void {
         this.wifiService = new WifiInfoService();
@@ -103,9 +125,15 @@ export default class WifiSignalPlusExtension extends Extension {
             .init()
             .then(() => {
                 if (!this.wifiService) return;
+                this.wifiService.requestScan();
+                this.wifiService.watchDeviceSignals(() => {
+                    this.wifiService?.requestScan();
+                    this.refresh();
+                });
                 this.createIndicator();
                 this.refresh();
                 this.startRefreshTimer();
+                this.startBackgroundScanTimer();
             })
             .catch(e => {
                 console.error('[WiFi Signal Plus] Failed to initialize:', e);
@@ -113,7 +141,10 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     disable(): void {
+        this.stopBackgroundScanTimer();
         this.stopRefreshTimer();
+        this.wifiService?.unwatchDeviceSignals();
+        this.clearNearbyItems();
         this.indicator?.destroy();
         this.wifiService?.destroy();
 
@@ -124,6 +155,10 @@ export default class WifiSignalPlusExtension extends Extension {
         this.signalGraph = null;
         this.signalHistory.length = 0;
         this.menuItems.clear();
+        this.nearbySeparator = null;
+        this.nearbyItems = [];
+        this.currentConnectedBssid = undefined;
+        this.isMenuOpen = false;
     }
 
     private createIndicator(): void {
@@ -156,7 +191,13 @@ export default class WifiSignalPlusExtension extends Extension {
         const menu = this.indicator.menu as PopupMenu.PopupMenu;
         menu.box.add_style_class_name('wifi-signal-plus-popup');
         menu.connect('open-state-changed', (_menu, isOpen: boolean) => {
-            if (isOpen) this.refresh();
+            this.isMenuOpen = isOpen;
+            if (isOpen) {
+                this.stopBackgroundScanTimer();
+                this.refresh();
+            } else {
+                this.startBackgroundScanTimer();
+            }
             return undefined;
         });
 
@@ -177,6 +218,9 @@ export default class WifiSignalPlusExtension extends Extension {
                 this.addMenuItem(menu, id, label, ITEMS_WITH_BAR.has(id));
             }
         });
+
+        this.nearbySeparator = new PopupMenu.PopupSeparatorMenuItem('Nearby Networks');
+        menu.addMenuItem(this.nearbySeparator);
     }
 
     private addMenuItem(
@@ -319,8 +363,13 @@ export default class WifiSignalPlusExtension extends Extension {
         if (!this.wifiService || !this.label) return;
 
         const info = await this.wifiService.getConnectionInfo();
+        this.currentConnectedBssid = isConnected(info) ? info.bssid : undefined;
         this.updateIndicatorLabel(info);
         this.updateMenuContent(info);
+
+        if (this.isMenuOpen) {
+            this.updateNearbyNetworks();
+        }
     }
 
     private updateIndicatorLabel(info: WifiConnectionInfo): void {
@@ -464,6 +513,227 @@ export default class WifiSignalPlusExtension extends Extension {
         return `${signalStrength} dBm (${quality})`;
     }
 
+    private async updateNearbyNetworks(): Promise<void> {
+        if (!this.wifiService || !this.indicator) return;
+
+        const menu = this.indicator.menu as PopupMenu.PopupMenu;
+        this.clearNearbyItems();
+
+        const grouped = await this.wifiService.getAvailableNetworks(this.currentConnectedBssid);
+
+        for (const [ssid, networks] of grouped) {
+            const card = this.createNetworkCard(ssid, networks[0], networks);
+            menu.addMenuItem(card);
+            this.nearbyItems.push(card);
+        }
+    }
+
+    private createNetworkCard(
+        ssid: string,
+        bestAp: ScannedNetwork,
+        allAps: ScannedNetwork[],
+    ): PopupMenu.PopupSubMenuMenuItem {
+        const card = new PopupMenu.PopupSubMenuMenuItem(ssid);
+        card.add_style_class_name('wifi-nearby-card');
+
+        this.createCardHeader(card, ssid, bestAp, allAps.length);
+
+        for (const ap of allAps) {
+            const row = this.createApRow(ap);
+            card.menu.addMenuItem(row);
+        }
+
+        return card;
+    }
+
+    private createCardHeader(
+        card: PopupMenu.PopupSubMenuMenuItem,
+        ssid: string,
+        bestAp: ScannedNetwork,
+        apCount: number,
+    ): void {
+        const headerBox = new St.BoxLayout({
+            style_class: 'wifi-nearby-card-header',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        const genIcon = this.createGenerationIcon(bestAp.generation);
+        if (genIcon) {
+            headerBox.add_child(genIcon);
+        }
+
+        const ssidLabel = new St.Label({
+            text: ssid,
+            style_class: 'wifi-nearby-card-ssid',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        headerBox.add_child(ssidLabel);
+
+        const metricsBox = this.createCardMetrics(bestAp, apCount);
+        headerBox.add_child(metricsBox);
+
+        card.replace_child(card.label, headerBox);
+
+        // Remove the expander (identified by .popup-menu-item-expander)
+        for (const child of card.get_children()) {
+            const widget = child as St.Widget;
+            if (widget.has_style_class_name?.('popup-menu-item-expander')) {
+                card.remove_child(child);
+                child.destroy();
+                break;
+            }
+        }
+    }
+
+    private createCardMetrics(ap: ScannedNetwork, apCount: number): St.BoxLayout {
+        const box = new St.BoxLayout({
+            style_class: 'wifi-nearby-card-header',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        // Signal % colored
+        const quality = getSignalQualityFromPercent(ap.signalPercent);
+        const signalColor = SIGNAL_QUALITY_BAR_COLORS[quality] ?? '#ffffff';
+        const signalLabel = new St.Label({
+            text: `${ap.signalPercent}%`,
+            style_class: 'wifi-nearby-card-signal',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        signalLabel.set_style(`color: ${signalColor};`);
+        box.add_child(signalLabel);
+
+        // Band badge
+        const bandBadge = new St.Label({
+            text: this.formatBandShort(ap.band),
+            style_class: 'wifi-nearby-badge',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        box.add_child(bandBadge);
+
+        // Security badge
+        const secBadge = new St.Label({
+            text: ap.security,
+            style_class: ap.security === 'Open'
+                ? 'wifi-nearby-badge wifi-nearby-badge-open'
+                : 'wifi-nearby-badge',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        box.add_child(secBadge);
+
+        // AP count
+        if (apCount > 1) {
+            const countLabel = new St.Label({
+                text: `×${apCount}`,
+                style_class: 'wifi-nearby-card-count',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            box.add_child(countLabel);
+        }
+
+        return box;
+    }
+
+    private createApRow(ap: ScannedNetwork): PopupMenu.PopupBaseMenuItem {
+        const item = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        item.add_style_class_name('wifi-nearby-ap');
+
+        const outerBox = new St.BoxLayout({ vertical: true, x_expand: true });
+
+        // Info row: BSSID + details + signal%
+        const infoRow = new St.BoxLayout({ x_expand: true });
+
+        const bssidLabel = new St.Label({
+            text: ap.bssid.toUpperCase(),
+            style_class: 'wifi-nearby-ap-bssid',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        infoRow.add_child(bssidLabel);
+
+        const detailParts: string[] = [];
+        detailParts.push(`Ch ${ap.channel}`);
+        if ((ap.bandwidth as number) > 20) {
+            detailParts.push(`${ap.bandwidth} MHz`);
+        }
+        if ((ap.maxBitrate as number) > 0) {
+            detailParts.push(`${ap.maxBitrate} Mbit/s`);
+        }
+
+        const detailsLabel = new St.Label({
+            text: detailParts.join(' · '),
+            style_class: 'wifi-nearby-ap-details',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        infoRow.add_child(detailsLabel);
+
+        const quality = getSignalQualityFromPercent(ap.signalPercent);
+        const signalColor = SIGNAL_QUALITY_BAR_COLORS[quality] ?? '#ffffff';
+
+        const signalLabel = new St.Label({
+            text: `${ap.signalPercent}%`,
+            style_class: 'wifi-nearby-ap-signal',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        signalLabel.set_style(`color: ${signalColor};`);
+        infoRow.add_child(signalLabel);
+
+        outerBox.add_child(infoRow);
+
+        // Signal bar
+        const barTrack = new St.Widget({
+            style_class: 'wifi-bar-track',
+            x_expand: true,
+        });
+        const barFill = new St.Widget({
+            style_class: 'wifi-bar-fill',
+        });
+        barFill.set_style(`background-color: ${signalColor};`);
+        barTrack.add_child(barFill);
+        outerBox.add_child(barTrack);
+
+        // Set bar width after allocation
+        barTrack.connect('notify::allocation', () => {
+            const trackWidth = barTrack.width;
+            if (trackWidth > 0) {
+                barFill.set_width(Math.round(((ap.signalPercent as number) / 100) * trackWidth));
+            }
+        });
+
+        item.add_child(outerBox);
+        return item;
+    }
+
+    private createGenerationIcon(generation: WifiGeneration): St.Icon | null {
+        const iconFilename = getGenerationIconFilename(generation);
+        if (!iconFilename) return null;
+
+        const iconPath = GLib.build_filenamev([this.path, 'icons', iconFilename]);
+        const file = Gio.File.new_for_path(iconPath);
+
+        return new St.Icon({
+            gicon: new Gio.FileIcon({ file }),
+            icon_size: 16,
+            style_class: 'wifi-nearby-card-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+    }
+
+    private formatBandShort(band: FrequencyBand): string {
+        if (band === '2.4 GHz') return '2.4G';
+        if (band === '5 GHz') return '5G';
+        if (band === '6 GHz') return '6G';
+        return band;
+    }
+
+    private clearNearbyItems(): void {
+        for (const item of this.nearbyItems) {
+            item.destroy();
+        }
+        this.nearbyItems = [];
+    }
+
     private startRefreshTimer(): void {
         this.stopRefreshTimer();
         this.refreshTimeout = GLib.timeout_add_seconds(
@@ -480,6 +750,25 @@ export default class WifiSignalPlusExtension extends Extension {
         if (this.refreshTimeout !== null) {
             GLib.source_remove(this.refreshTimeout);
             this.refreshTimeout = null;
+        }
+    }
+
+    private startBackgroundScanTimer(): void {
+        this.stopBackgroundScanTimer();
+        this.backgroundScanTimeout = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            BACKGROUND_SCAN_INTERVAL_SECONDS,
+            () => {
+                this.wifiService?.requestScan();
+                return GLib.SOURCE_CONTINUE;
+            }
+        );
+    }
+
+    private stopBackgroundScanTimer(): void {
+        if (this.backgroundScanTimeout !== null) {
+            GLib.source_remove(this.backgroundScanTimeout);
+            this.backgroundScanTimeout = null;
         }
     }
 }

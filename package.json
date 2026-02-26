@@ -8,6 +8,7 @@
     "copy-assets": "cp metadata.json stylesheet.css dist/ && cp -r src/icons dist/",
     "install-extension": "npm run build && rm -rf ~/.local/share/gnome-shell/extensions/wifi-signal-plus@jalil.arfaoui.net && cp -r dist ~/.local/share/gnome-shell/extensions/wifi-signal-plus@jalil.arfaoui.net",
     "nested": "npm run install-extension && MUTTER_DEBUG_DUMMY_MODE_SPECS=1920x1080 dbus-run-session gnome-shell --devkit --wayland",
+    "nested:safe": "npm run build && rm -rf /tmp/wifi-signal-plus-test && mkdir -p /tmp/wifi-signal-plus-test/gnome-shell/extensions && cp -r dist /tmp/wifi-signal-plus-test/gnome-shell/extensions/wifi-signal-plus@jalil.arfaoui.net && XDG_DATA_HOME=/tmp/wifi-signal-plus-test MUTTER_DEBUG_DUMMY_MODE_SPECS=1920x1080 dbus-run-session -- gnome-shell --devkit --wayland",
     "reload": "npm run install-extension && gnome-extensions disable wifi-signal-plus@jalil.arfaoui.net 2>/dev/null; gnome-extensions enable wifi-signal-plus@jalil.arfaoui.net",
     "watch": "tsc --watch",
     "pack": "npm run build && cd dist && gnome-extensions pack --extra-source=icons --extra-source=wifiInfo.js --extra-source=wifiGeneration.js --extra-source=types.js --force --out-dir=..",

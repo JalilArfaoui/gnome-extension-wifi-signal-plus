@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     parseIwLinkOutput,
+    parseIwScanDump,
     createEmptyIwLinkInfo,
     WIFI_GENERATIONS,
     IEEE_STANDARDS,
@@ -10,7 +11,7 @@ import {
     getGenerationIconFilename,
     isKnownGeneration,
 } from './wifiGeneration';
-import { GUARD_INTERVALS } from './types';
+import { GUARD_INTERVALS, asSignalPercent, getSignalQualityFromPercent } from './types';
 
 describe('createEmptyIwLinkInfo', () => {
     it('should create an object with all null values and UNKNOWN generation', () => {
@@ -423,5 +424,224 @@ describe('GENERATION_CSS_CLASSES', () => {
         expect(classes).toContain('wifi-gen-6');
         expect(classes).toContain('wifi-gen-7');
         expect(classes).toContain('wifi-disconnected');
+    });
+});
+
+describe('parseIwScanDump', () => {
+    it('should return an empty map for empty input', () => {
+        const result = parseIwScanDump('');
+        expect(result.size).toBe(0);
+    });
+
+    it('should detect WiFi 6 via HE capabilities', () => {
+        const output = `BSS ae:8b:a9:51:30:23(on wlp192s0) -- associated
+\tlast seen: 340 ms ago
+\tTSF: 123456789 usec (0d, 00:00:00)
+\tfreq: 5220
+\tbeacon interval: 100 TUs
+\tcapability: ESS Privacy ShortSlotTime (0x0411)
+\tsignal: -39.00 dBm
+\tSSID: MyNetwork
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tHT operation:
+\t\t * primary channel: 44
+\tVHT capabilities:
+\t\tVHT Capabilities (0x338b79b2):
+\tVHT operation:
+\t\t * channel width: 1 (80 MHz)
+\tHE capabilities:
+\t\tHE MAC Capabilities (0x000801185018):
+\t\tHE PHY Capabilities (0x043c2e090f):`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.size).toBe(1);
+        expect(result.get('ae:8b:a9:51:30:23')).toBe(WIFI_GENERATIONS.WIFI_6);
+    });
+
+    it('should detect WiFi 7 via EHT capabilities', () => {
+        const output = `BSS 11:22:33:44:55:66(on wlan0)
+\tfreq: 6115
+\tsignal: -45.00 dBm
+\tSSID: WiFi7Network
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tVHT capabilities:
+\t\tVHT Capabilities (0x338b79b2):
+\tHE capabilities:
+\t\tHE MAC Capabilities (0x000801185018):
+\tEHT capabilities:
+\t\tEHT MAC Capabilities (0x0000):`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.size).toBe(1);
+        expect(result.get('11:22:33:44:55:66')).toBe(WIFI_GENERATIONS.WIFI_7);
+    });
+
+    it('should detect WiFi 5 via VHT capabilities', () => {
+        const output = `BSS aa:bb:cc:dd:ee:ff(on wlan0)
+\tfreq: 5180
+\tsignal: -55.00 dBm
+\tSSID: AcNetwork
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tHT operation:
+\t\t * primary channel: 36
+\tVHT capabilities:
+\t\tVHT Capabilities (0x338b79b2):
+\tVHT operation:
+\t\t * channel width: 1 (80 MHz)`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.size).toBe(1);
+        expect(result.get('aa:bb:cc:dd:ee:ff')).toBe(WIFI_GENERATIONS.WIFI_5);
+    });
+
+    it('should detect WiFi 4 via HT capabilities only', () => {
+        const output = `BSS 00:11:22:33:44:55(on wlan0)
+\tfreq: 2437
+\tsignal: -65.00 dBm
+\tSSID: OldRouter
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tHT operation:
+\t\t * primary channel: 6`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.size).toBe(1);
+        expect(result.get('00:11:22:33:44:55')).toBe(WIFI_GENERATIONS.WIFI_4);
+    });
+
+    it('should return UNKNOWN for BSS without any capabilities', () => {
+        const output = `BSS ff:ee:dd:cc:bb:aa(on wlan0)
+\tfreq: 2412
+\tsignal: -80.00 dBm
+\tSSID: LegacyAP`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.size).toBe(1);
+        expect(result.get('ff:ee:dd:cc:bb:aa')).toBe(WIFI_GENERATIONS.UNKNOWN);
+    });
+
+    it('should parse multiple BSS blocks', () => {
+        const output = `BSS aa:bb:cc:dd:ee:01(on wlan0)
+\tfreq: 5180
+\tSSID: FastNetwork
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tVHT capabilities:
+\t\tVHT Capabilities (0x338b79b2):
+\tHE capabilities:
+\t\tHE MAC Capabilities (0x000801185018):
+BSS aa:bb:cc:dd:ee:02(on wlan0)
+\tfreq: 2437
+\tSSID: SlowNetwork
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+BSS aa:bb:cc:dd:ee:03(on wlan0)
+\tfreq: 2412
+\tSSID: LegacyNetwork`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.size).toBe(3);
+        expect(result.get('aa:bb:cc:dd:ee:01')).toBe(WIFI_GENERATIONS.WIFI_6);
+        expect(result.get('aa:bb:cc:dd:ee:02')).toBe(WIFI_GENERATIONS.WIFI_4);
+        expect(result.get('aa:bb:cc:dd:ee:03')).toBe(WIFI_GENERATIONS.UNKNOWN);
+    });
+
+    it('should normalize BSSID to lowercase', () => {
+        const output = `BSS AA:BB:CC:DD:EE:FF(on wlan0)
+\tfreq: 5180
+\tSSID: UpperCaseNetwork
+\tHE capabilities:
+\t\tHE MAC Capabilities (0x000801185018):`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.get('aa:bb:cc:dd:ee:ff')).toBe(WIFI_GENERATIONS.WIFI_6);
+    });
+
+    it('should pick the highest generation when multiple capabilities present', () => {
+        const output = `BSS aa:bb:cc:dd:ee:ff(on wlan0)
+\tfreq: 5220
+\tSSID: DualCapNetwork
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tHT operation:
+\t\t * primary channel: 44
+\tVHT capabilities:
+\t\tVHT Capabilities (0x338b79b2):
+\tHE capabilities:
+\t\tHE MAC Capabilities (0x000801185018):`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.get('aa:bb:cc:dd:ee:ff')).toBe(WIFI_GENERATIONS.WIFI_6);
+    });
+
+    it('should detect WiFi 5 via VHT operation without VHT capabilities', () => {
+        const output = `BSS aa:bb:cc:dd:ee:ff(on wlan0)
+\tfreq: 5180
+\tSSID: VhtOpOnly
+\tHT capabilities:
+\t\tCapabilities: 0x0963
+\tVHT operation:
+\t\t * channel width: 1 (80 MHz)`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.get('aa:bb:cc:dd:ee:ff')).toBe(WIFI_GENERATIONS.WIFI_5);
+    });
+
+    it('should detect WiFi 4 via HT operation without HT capabilities', () => {
+        const output = `BSS aa:bb:cc:dd:ee:ff(on wlan0)
+\tfreq: 2437
+\tSSID: HtOpOnly
+\tHT operation:
+\t\t * primary channel: 6`;
+
+        const result = parseIwScanDump(output);
+
+        expect(result.get('aa:bb:cc:dd:ee:ff')).toBe(WIFI_GENERATIONS.WIFI_4);
+    });
+});
+
+describe('getSignalQualityFromPercent', () => {
+    it('should return Poor for 0%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(0))).toBe('Poor');
+    });
+
+    it('should return Poor for 19%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(19))).toBe('Poor');
+    });
+
+    it('should return Weak for 20%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(20))).toBe('Weak');
+    });
+
+    it('should return Fair for 40%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(40))).toBe('Fair');
+    });
+
+    it('should return Fair for 59%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(59))).toBe('Fair');
+    });
+
+    it('should return Good for 60%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(60))).toBe('Good');
+    });
+
+    it('should return Excellent for 80%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(80))).toBe('Excellent');
+    });
+
+    it('should return Excellent for 100%', () => {
+        expect(getSignalQualityFromPercent(asSignalPercent(100))).toBe('Excellent');
     });
 });

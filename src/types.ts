@@ -141,6 +141,19 @@ export interface ConnectedInfo extends BaseConnectionInfo {
     readonly rxBitrate: BitrateMbps | null;
 }
 
+export interface ScannedNetwork {
+    readonly ssid: string;
+    readonly bssid: string;
+    readonly frequency: FrequencyMHz;
+    readonly channel: ChannelNumber;
+    readonly band: FrequencyBand;
+    readonly bandwidth: ChannelWidthMHz;
+    readonly maxBitrate: BitrateMbps;
+    readonly signalPercent: SignalPercent;
+    readonly security: SecurityProtocol;
+    readonly generation: WifiGeneration;
+}
+
 export type WifiConnectionInfo = DisconnectedInfo | ConnectedInfo;
 
 export function isConnected(info: WifiConnectionInfo): info is ConnectedInfo {
@@ -156,6 +169,22 @@ export const asChannelNumber = (value: number): ChannelNumber => value as Channe
 export const asMcsIndex = (value: number): McsIndex => value as McsIndex;
 export const asSpatialStreams = (value: number): SpatialStreams => value as SpatialStreams;
 export const asGuardIntervalUs = (value: number): GuardIntervalUs => value as GuardIntervalUs;
+
+const SIGNAL_PERCENT_THRESHOLDS = {
+    Excellent: 80,
+    Good: 60,
+    Fair: 40,
+    Weak: 20,
+} as const;
+
+export function getSignalQualityFromPercent(signalPercent: SignalPercent): SignalQuality {
+    const pct = signalPercent as number;
+    if (pct >= SIGNAL_PERCENT_THRESHOLDS.Excellent) return 'Excellent';
+    if (pct >= SIGNAL_PERCENT_THRESHOLDS.Good) return 'Good';
+    if (pct >= SIGNAL_PERCENT_THRESHOLDS.Fair) return 'Fair';
+    if (pct >= SIGNAL_PERCENT_THRESHOLDS.Weak) return 'Weak';
+    return 'Poor';
+}
 
 export function createEmptyIwLinkInfo(): IwLinkInfo {
     return Object.freeze({
