@@ -120,12 +120,15 @@ export default class WifiSignalPlusExtension extends Extension {
     private nearbyUpdatePending = false;
     private currentConnectedBssid: string | undefined;
     private isMenuOpen = false;
+    private enableEpoch = 0;
 
     enable(): void {
+        const epoch = ++this.enableEpoch;
         this.wifiService = new WifiInfoService();
         this.wifiService
             .init()
             .then(() => {
+                if (epoch !== this.enableEpoch) return;
                 if (!this.wifiService) return;
                 this.wifiService.requestScan();
                 this.wifiService.watchDeviceSignals(() => {
