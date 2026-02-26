@@ -133,10 +133,10 @@ export default class WifiSignalPlusExtension extends Extension {
                 this.wifiService.requestScan();
                 this.wifiService.watchDeviceSignals(() => {
                     this.wifiService?.requestScan();
-                    this.refresh();
+                    this.scheduleRefresh();
                 });
                 this.createIndicator();
-                this.refresh();
+                this.scheduleRefresh();
                 this.startRefreshTimer();
                 this.startBackgroundScanTimer();
             })
@@ -167,6 +167,7 @@ export default class WifiSignalPlusExtension extends Extension {
         this.nearbySeparator = null;
         this.nearbySection = null;
         this.nearbyItems = [];
+        this.refreshPending = false;
         this.nearbyUpdatePending = false;
         this.currentConnectedBssid = undefined;
         this.isMenuOpen = false;
@@ -205,7 +206,7 @@ export default class WifiSignalPlusExtension extends Extension {
             this.isMenuOpen = isOpen;
             if (isOpen) {
                 this.stopBackgroundScanTimer();
-                this.refresh();
+                this.scheduleRefresh();
             } else {
                 this.startBackgroundScanTimer();
             }
@@ -436,16 +437,31 @@ export default class WifiSignalPlusExtension extends Extension {
         this.headerIcon.visible = true;
     }
 
+    private refreshPending = false;
+
+    private scheduleRefresh(): void {
+        this.refresh().catch(e => {
+            console.error('[WiFi Signal Plus] Refresh failed:', e);
+        });
+    }
+
     private async refresh(): Promise<void> {
-        if (!this.wifiService || !this.label) return;
+        if (!this.wifiService || !this.label || this.refreshPending) return;
 
-        const info = await this.wifiService.getConnectionInfo();
-        this.currentConnectedBssid = isConnected(info) ? info.bssid : undefined;
-        this.updateIndicatorLabel(info);
-        this.updateMenuContent(info);
+        this.refreshPending = true;
+        try {
+            const info = await this.wifiService.getConnectionInfo();
+            if (!this.wifiService) return;
 
-        if (this.isMenuOpen) {
-            this.updateNearbyNetworks();
+            this.currentConnectedBssid = isConnected(info) ? info.bssid : undefined;
+            this.updateIndicatorLabel(info);
+            this.updateMenuContent(info);
+
+            if (this.isMenuOpen) {
+                await this.updateNearbyNetworks();
+            }
+        } finally {
+            this.refreshPending = false;
         }
     }
 
@@ -840,7 +856,7 @@ export default class WifiSignalPlusExtension extends Extension {
             GLib.PRIORITY_DEFAULT,
             REFRESH_INTERVAL_SECONDS,
             () => {
-                this.refresh();
+                this.scheduleRefresh();
                 return GLib.SOURCE_CONTINUE;
             }
         );
