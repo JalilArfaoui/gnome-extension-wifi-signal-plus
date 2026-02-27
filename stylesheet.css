@@ -156,6 +156,11 @@
     icon-size: 16px;
 }
 
+.wifi-ap-gen-icon {
+    icon-size: 14px;
+    margin-right: 6px;
+}
+
 .wifi-nearby-card-ssid {
     font-weight: 500;
 }

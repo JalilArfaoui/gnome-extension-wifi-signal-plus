@@ -34,7 +34,6 @@ import {
     type GenerationCssClass,
     type ChannelWidthMHz,
     type SignalDbm,
-    type FrequencyBand,
     type SpeedQuality,
     type WifiGeneration,
 } from './types.js';
@@ -824,14 +823,6 @@ export default class WifiSignalPlusExtension extends Extension {
             y_align: Clutter.ActorAlign.CENTER,
         });
 
-        // Band badge
-        const bandBadge = new St.Label({
-            text: this.formatBandShort(ap.band),
-            style_class: 'wifi-nearby-badge',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        box.add_child(bandBadge);
-
         // Security badge
         const secBadge = new St.Label({
             text: ap.security,
@@ -874,8 +865,19 @@ export default class WifiSignalPlusExtension extends Extension {
 
         const outerBox = new St.BoxLayout({ vertical: true, x_expand: true });
 
-        // Info row: BSSID + details + signal%
+        // Info row: generation + BSSID + details + signal%
         const infoRow = new St.BoxLayout({ x_expand: true });
+
+        const genIconFilename = getGenerationIconFilename(ap.generation);
+        if (genIconFilename) {
+            const iconPath = GLib.build_filenamev([this.path, 'icons', genIconFilename]);
+            const genIcon = new St.Icon({
+                gicon: new Gio.FileIcon({ file: Gio.File.new_for_path(iconPath) }),
+                style_class: 'wifi-ap-gen-icon',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            infoRow.add_child(genIcon);
+        }
 
         const bssidLabel = new St.Label({
             text: ap.bssid.toUpperCase(),
@@ -885,6 +887,7 @@ export default class WifiSignalPlusExtension extends Extension {
         infoRow.add_child(bssidLabel);
 
         const detailParts: string[] = [];
+        detailParts.push(ap.band);
         detailParts.push(`Ch ${ap.channel}`);
         if ((ap.bandwidth as number) > 20) {
             detailParts.push(`${ap.bandwidth} MHz`);
@@ -959,13 +962,6 @@ export default class WifiSignalPlusExtension extends Extension {
             style_class: 'wifi-nearby-card-icon',
             y_align: Clutter.ActorAlign.CENTER,
         });
-    }
-
-    private formatBandShort(band: FrequencyBand): string {
-        if (band === '2.4 GHz') return '2.4G';
-        if (band === '5 GHz') return '5G';
-        if (band === '6 GHz') return '6G';
-        return band;
     }
 
     private clearNearbyItems(): void {
