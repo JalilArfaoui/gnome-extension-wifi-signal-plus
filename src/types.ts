@@ -51,6 +51,9 @@ export type FrequencyBand = (typeof FREQUENCY_BANDS)[number];
 export const SIGNAL_QUALITIES = ['Excellent', 'Good', 'Fair', 'Weak', 'Poor', 'Unknown'] as const;
 export type SignalQuality = (typeof SIGNAL_QUALITIES)[number];
 
+export const SPEED_QUALITIES = ['Excellent', 'VeryGood', 'Good', 'OK', 'Weak', 'Poor'] as const;
+export type SpeedQuality = (typeof SPEED_QUALITIES)[number];
+
 export const SIGNAL_THRESHOLDS = {
     Excellent: -50,
     Good: -60,
@@ -183,6 +186,24 @@ export function getSignalQualityFromPercent(signalPercent: SignalPercent): Signa
     if (pct >= SIGNAL_PERCENT_THRESHOLDS.Good) return 'Good';
     if (pct >= SIGNAL_PERCENT_THRESHOLDS.Fair) return 'Fair';
     if (pct >= SIGNAL_PERCENT_THRESHOLDS.Weak) return 'Weak';
+    return 'Poor';
+}
+
+const SPEED_THRESHOLDS = {
+    Excellent: 1000,
+    VeryGood: 300,
+    Good: 100,
+    OK: 50,
+    Weak: 20,
+} as const;
+
+export function getSpeedQuality(bitrate: BitrateMbps): SpeedQuality {
+    const mbps = bitrate as number;
+    if (mbps >= SPEED_THRESHOLDS.Excellent) return 'Excellent';
+    if (mbps >= SPEED_THRESHOLDS.VeryGood) return 'VeryGood';
+    if (mbps >= SPEED_THRESHOLDS.Good) return 'Good';
+    if (mbps >= SPEED_THRESHOLDS.OK) return 'OK';
+    if (mbps >= SPEED_THRESHOLDS.Weak) return 'Weak';
     return 'Poor';
 }
 

@@ -211,6 +211,12 @@
     color: rgba(255, 255, 255, 0.6);
 }
 
+.wifi-nearby-ap-speed {
+    font-weight: bold;
+    font-size: 0.85em;
+    margin-right: 8px;
+}
+
 .wifi-nearby-ap-signal {
     font-weight: bold;
     font-size: 0.85em;

@@ -11,7 +11,13 @@ import {
     getGenerationIconFilename,
     isKnownGeneration,
 } from './wifiGeneration';
-import { GUARD_INTERVALS, asSignalPercent, getSignalQualityFromPercent } from './types';
+import {
+    GUARD_INTERVALS,
+    asBitrateMbps,
+    asSignalPercent,
+    getSignalQualityFromPercent,
+    getSpeedQuality,
+} from './types';
 
 describe('createEmptyIwLinkInfo', () => {
     it('should create an object with all null values and UNKNOWN generation', () => {
@@ -643,5 +649,55 @@ describe('getSignalQualityFromPercent', () => {
 
     it('should return Excellent for 100%', () => {
         expect(getSignalQualityFromPercent(asSignalPercent(100))).toBe('Excellent');
+    });
+});
+
+describe('getSpeedQuality', () => {
+    it('should return Poor for 0 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(0))).toBe('Poor');
+    });
+
+    it('should return Poor for 19 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(19))).toBe('Poor');
+    });
+
+    it('should return Weak for 20 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(20))).toBe('Weak');
+    });
+
+    it('should return Weak for 49 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(49))).toBe('Weak');
+    });
+
+    it('should return OK for 50 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(50))).toBe('OK');
+    });
+
+    it('should return OK for 99 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(99))).toBe('OK');
+    });
+
+    it('should return Good for 100 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(100))).toBe('Good');
+    });
+
+    it('should return Good for 299 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(299))).toBe('Good');
+    });
+
+    it('should return VeryGood for 300 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(300))).toBe('VeryGood');
+    });
+
+    it('should return VeryGood for 999 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(999))).toBe('VeryGood');
+    });
+
+    it('should return Excellent for 1000 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(1000))).toBe('Excellent');
+    });
+
+    it('should return Excellent for 2400 Mbit/s', () => {
+        expect(getSpeedQuality(asBitrateMbps(2400))).toBe('Excellent');
     });
 });

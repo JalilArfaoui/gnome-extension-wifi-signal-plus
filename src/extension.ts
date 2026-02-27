@@ -30,10 +30,12 @@ import {
 } from './wifiGeneration.js';
 import {
     getSignalQualityFromPercent,
+    getSpeedQuality,
     type GenerationCssClass,
     type ChannelWidthMHz,
     type SignalDbm,
     type FrequencyBand,
+    type SpeedQuality,
     type WifiGeneration,
 } from './types.js';
 
@@ -59,6 +61,15 @@ const SIGNAL_QUALITY_BAR_COLORS: Readonly<Record<string, string>> = {
     Excellent: '#33d17a',
     Good: '#8ff0a4',
     Fair: '#f6d32d',
+    Weak: '#ff7800',
+    Poor: '#e01b24',
+};
+
+const SPEED_QUALITY_COLORS: Readonly<Record<SpeedQuality, string>> = {
+    Excellent: '#c061cb',
+    VeryGood: '#62a0ea',
+    Good: '#33d17a',
+    OK: '#f6d32d',
     Weak: '#ff7800',
     Poor: '#e01b24',
 };
@@ -851,9 +862,6 @@ export default class WifiSignalPlusExtension extends Extension {
         if ((ap.bandwidth as number) > 20) {
             detailParts.push(`${ap.bandwidth} MHz`);
         }
-        if ((ap.maxBitrate as number) > 0) {
-            detailParts.push(`${ap.maxBitrate} Mbit/s`);
-        }
 
         const detailsLabel = new St.Label({
             text: detailParts.join(' · '),
@@ -862,6 +870,17 @@ export default class WifiSignalPlusExtension extends Extension {
             y_align: Clutter.ActorAlign.CENTER,
         });
         infoRow.add_child(detailsLabel);
+
+        if ((ap.maxBitrate as number) > 0) {
+            const speedQuality = getSpeedQuality(ap.maxBitrate);
+            const speedLabel = new St.Label({
+                text: `${ap.maxBitrate} Mbit/s`,
+                style_class: 'wifi-nearby-ap-speed',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            speedLabel.set_style(`color: ${SPEED_QUALITY_COLORS[speedQuality]};`);
+            infoRow.add_child(speedLabel);
+        }
 
         const quality = getSignalQualityFromPercent(ap.signalPercent);
         const signalColor = SIGNAL_QUALITY_BAR_COLORS[quality] ?? '#ffffff';
