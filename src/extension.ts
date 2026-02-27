@@ -602,17 +602,27 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private formatBitrate(info: ConnectedInfo): string {
-        const { txBitrate, rxBitrate, bitrate } = info;
+        const { txBitrate, rxBitrate, bitrate, maxBitrate } = info;
 
+        let speed: string;
         if (txBitrate !== null && rxBitrate !== null) {
             const tx = txBitrate as number;
             const rx = rxBitrate as number;
-            return tx === rx ? `${tx} Mbit/s` : `↑${tx} ↓${rx} Mbit/s`;
+            speed = tx === rx ? `${tx} Mbit/s` : `↑${tx} ↓${rx} Mbit/s`;
+        } else if (txBitrate !== null) {
+            speed = `↑${txBitrate} Mbit/s`;
+        } else if (rxBitrate !== null) {
+            speed = `↓${rxBitrate} Mbit/s`;
+        } else {
+            speed = `${bitrate} Mbit/s`;
         }
 
-        if (txBitrate !== null) return `↑${txBitrate} Mbit/s`;
-        if (rxBitrate !== null) return `↓${rxBitrate} Mbit/s`;
-        return `${bitrate} Mbit/s`;
+        const max = maxBitrate as number;
+        if (max > 0) {
+            speed += ` (max ${max})`;
+        }
+
+        return speed;
     }
 
     private formatChannelWidth(width: ChannelWidthMHz | null): string {

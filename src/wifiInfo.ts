@@ -297,6 +297,7 @@ export class WifiInfoService {
             channelWidth: iwInfo.channelWidth,
             txBitrate: iwInfo.txBitrate,
             rxBitrate: iwInfo.rxBitrate,
+            maxBitrate: asBitrateMbps(ap.get_max_bitrate() / 1000),
         });
     }
 
