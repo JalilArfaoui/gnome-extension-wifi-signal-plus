@@ -160,12 +160,6 @@
     font-weight: 500;
 }
 
-.wifi-nearby-card-signal {
-    font-weight: bold;
-    font-size: 0.9em;
-    min-width: 3em;
-}
-
 .wifi-nearby-card-count {
     font-size: 0.8em;
     color: rgba(255, 255, 255, 0.5);

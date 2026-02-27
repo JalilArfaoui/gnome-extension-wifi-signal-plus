@@ -739,7 +739,11 @@ export default class WifiSignalPlusExtension extends Extension {
         card._ssid = ssid;
         card.add_style_class_name('wifi-nearby-card');
 
-        this.createCardHeader(card, ssid, bestAp, allAps.length);
+        const barTrack = this.createCardHeader(card, ssid, bestAp, allAps.length);
+
+        card.menu.connect('open-state-changed', (_menu: PopupMenu.PopupSubMenu, isOpen: boolean): undefined => {
+            barTrack.visible = !isOpen;
+        });
 
         for (const ap of allAps) {
             const row = this.createApRow(ap);
@@ -754,7 +758,7 @@ export default class WifiSignalPlusExtension extends Extension {
         ssid: string,
         bestAp: ScannedNetwork,
         apCount: number,
-    ): void {
+    ): St.Widget {
         const headerBox = new St.BoxLayout({
             style_class: 'wifi-nearby-card-header',
             x_expand: true,
@@ -777,7 +781,29 @@ export default class WifiSignalPlusExtension extends Extension {
         const metricsBox = this.createCardMetrics(bestAp, apCount);
         headerBox.add_child(metricsBox);
 
-        card.replace_child(card.label, headerBox);
+        const outerBox = new St.BoxLayout({ vertical: true, x_expand: true });
+        outerBox.add_child(headerBox);
+
+        const quality = getSignalQualityFromPercent(bestAp.signalPercent);
+        const signalColor = SIGNAL_QUALITY_BAR_COLORS[quality] ?? '#ffffff';
+
+        const barTrack = new St.Widget({
+            style_class: 'wifi-bar-track',
+            x_expand: true,
+        });
+        const barFill = new St.Widget({ style_class: 'wifi-bar-fill' });
+        barFill.set_style(`background-color: ${signalColor};`);
+        barTrack.add_child(barFill);
+        outerBox.add_child(barTrack);
+
+        barTrack.connect('notify::allocation', () => {
+            const trackWidth = barTrack.width;
+            if (trackWidth > 0) {
+                barFill.set_width(Math.round(((bestAp.signalPercent as number) / 100) * trackWidth));
+            }
+        });
+
+        card.replace_child(card.label, outerBox);
 
         // Remove the expander (identified by .popup-menu-item-expander)
         for (const child of card.get_children()) {
@@ -788,6 +814,8 @@ export default class WifiSignalPlusExtension extends Extension {
                 break;
             }
         }
+
+        return barTrack;
     }
 
     private createCardMetrics(ap: ScannedNetwork, apCount: number): St.BoxLayout {
@@ -795,17 +823,6 @@ export default class WifiSignalPlusExtension extends Extension {
             style_class: 'wifi-nearby-card-header',
             y_align: Clutter.ActorAlign.CENTER,
         });
-
-        // Signal % colored
-        const quality = getSignalQualityFromPercent(ap.signalPercent);
-        const signalColor = SIGNAL_QUALITY_BAR_COLORS[quality] ?? '#ffffff';
-        const signalLabel = new St.Label({
-            text: `${ap.signalPercent}%`,
-            style_class: 'wifi-nearby-card-signal',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        signalLabel.set_style(`color: ${signalColor};`);
-        box.add_child(signalLabel);
 
         // Band badge
         const bandBadge = new St.Label({
