@@ -114,11 +114,16 @@ export default class WifiSignalPlusExtension extends Extension {
     private headerGenerationLabel: St.Label | null = null;
     private headerBandLabel: St.Label | null = null;
     private headerIcon: St.Icon | null = null;
+    private accessPointsSeparator: PopupMenu.PopupSeparatorMenuItem | null = null;
+    private accessPointsSection: PopupMenu.PopupMenuSection | null = null;
+    private accessPointsItems: PopupMenu.PopupBaseMenuItem[] = [];
+    private accessPointsUpdatePending = false;
     private nearbySeparator: PopupMenu.PopupSeparatorMenuItem | null = null;
     private nearbySection: PopupMenu.PopupMenuSection | null = null;
     private nearbyItems: NearbyNetworkCard[] = [];
     private nearbyUpdatePending = false;
     private currentConnectedSsid: string | undefined;
+    private currentConnectedBssid: string | undefined;
     private isMenuOpen = false;
     private enableEpoch = 0;
 
@@ -149,6 +154,7 @@ export default class WifiSignalPlusExtension extends Extension {
         this.stopBackgroundScanTimer();
         this.stopRefreshTimer();
         this.wifiService?.unwatchDeviceSignals();
+        this.clearAccessPointsItems();
         this.clearNearbyItems();
         this.indicator?.destroy();
         this.wifiService?.destroy();
@@ -164,12 +170,17 @@ export default class WifiSignalPlusExtension extends Extension {
         this.headerGenerationLabel = null;
         this.headerBandLabel = null;
         this.headerIcon = null;
+        this.accessPointsSeparator = null;
+        this.accessPointsSection = null;
+        this.accessPointsItems = [];
+        this.accessPointsUpdatePending = false;
         this.nearbySeparator = null;
         this.nearbySection = null;
         this.nearbyItems = [];
         this.refreshPending = false;
         this.nearbyUpdatePending = false;
         this.currentConnectedSsid = undefined;
+        this.currentConnectedBssid = undefined;
         this.isMenuOpen = false;
     }
 
@@ -230,6 +241,13 @@ export default class WifiSignalPlusExtension extends Extension {
                 this.addMenuItem(menu, id, label, ITEMS_WITH_BAR.has(id));
             }
         });
+
+        this.accessPointsSeparator = new PopupMenu.PopupSeparatorMenuItem('Access Points');
+        this.accessPointsSeparator.visible = false;
+        menu.addMenuItem(this.accessPointsSeparator);
+        this.accessPointsSection = new PopupMenu.PopupMenuSection();
+        this.accessPointsSection.actor.visible = false;
+        menu.addMenuItem(this.accessPointsSection);
 
         this.nearbySeparator = new PopupMenu.PopupSeparatorMenuItem('Nearby Networks');
         menu.addMenuItem(this.nearbySeparator);
@@ -447,10 +465,12 @@ export default class WifiSignalPlusExtension extends Extension {
             if (!this.wifiService) return;
 
             this.currentConnectedSsid = isConnected(info) ? info.ssid : undefined;
+            this.currentConnectedBssid = isConnected(info) ? info.bssid : undefined;
             this.updateIndicatorLabel(info);
             this.updateMenuContent(info);
 
             if (this.isMenuOpen) {
+                await this.updateAccessPoints();
                 await this.updateNearbyNetworks();
             }
         } finally {
@@ -517,6 +537,9 @@ export default class WifiSignalPlusExtension extends Extension {
                 this.updateMenuItem(id, PLACEHOLDER, 0);
             }
         }
+
+        this.clearAccessPointsItems();
+        this.setAccessPointsVisible(false);
 
         this.signalHistory.length = 0;
         this.signalGraph?.queue_repaint();
@@ -604,6 +627,56 @@ export default class WifiSignalPlusExtension extends Extension {
     private formatSignal(signalStrength: SignalDbm): string {
         const quality = getSignalQuality(signalStrength);
         return `${signalStrength} dBm (${quality})`;
+    }
+
+    private async updateAccessPoints(): Promise<void> {
+        if (!this.wifiService || !this.accessPointsSection || this.accessPointsUpdatePending) return;
+
+        if (!this.currentConnectedSsid) {
+            this.clearAccessPointsItems();
+            this.setAccessPointsVisible(false);
+            return;
+        }
+
+        this.accessPointsUpdatePending = true;
+        let accessPoints: ScannedNetwork[];
+        try {
+            accessPoints = await this.wifiService.getAccessPointsForSsid(this.currentConnectedSsid);
+        } finally {
+            this.accessPointsUpdatePending = false;
+        }
+
+        this.clearAccessPointsItems();
+
+        if (accessPoints.length <= 1) {
+            this.setAccessPointsVisible(false);
+            return;
+        }
+
+        this.setAccessPointsVisible(true);
+
+        for (const ap of accessPoints) {
+            const isActive = ap.bssid === this.currentConnectedBssid?.toLowerCase();
+            const row = this.createApRow(ap, isActive ? 'connected' : 'spacer');
+            this.accessPointsSection.addMenuItem(row);
+            this.accessPointsItems.push(row);
+        }
+    }
+
+    private setAccessPointsVisible(visible: boolean): void {
+        if (this.accessPointsSeparator) {
+            this.accessPointsSeparator.visible = visible;
+        }
+        if (this.accessPointsSection) {
+            this.accessPointsSection.actor.visible = visible;
+        }
+    }
+
+    private clearAccessPointsItems(): void {
+        for (const item of this.accessPointsItems) {
+            item.destroy();
+        }
+        this.accessPointsItems = [];
     }
 
     private async updateNearbyNetworks(): Promise<void> {
@@ -744,9 +817,22 @@ export default class WifiSignalPlusExtension extends Extension {
         return box;
     }
 
-    private createApRow(ap: ScannedNetwork): PopupMenu.PopupBaseMenuItem {
+    private createApRow(ap: ScannedNetwork, connectedIndicator: 'connected' | 'spacer' | 'none' = 'none'): PopupMenu.PopupBaseMenuItem {
         const item = new PopupMenu.PopupBaseMenuItem({ reactive: false });
         item.add_style_class_name('wifi-nearby-ap');
+
+        if (connectedIndicator === 'connected') {
+            const connectedIcon = new St.Icon({
+                icon_name: 'emblem-ok-symbolic',
+                icon_size: 12,
+                style_class: 'wifi-ap-connected-icon',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            item.add_child(connectedIcon);
+        } else if (connectedIndicator === 'spacer') {
+            const spacer = new St.Widget({ style_class: 'wifi-ap-icon-spacer' });
+            item.add_child(spacer);
+        }
 
         const outerBox = new St.BoxLayout({ vertical: true, x_expand: true });
 

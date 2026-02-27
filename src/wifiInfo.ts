@@ -139,6 +139,46 @@ export class WifiInfoService {
         });
     }
 
+    async getAccessPointsForSsid(ssid: string): Promise<ScannedNetwork[]> {
+        if (!this.client) return [];
+
+        const wifiDevice = this.findWifiDevice();
+        if (!wifiDevice) return [];
+
+        const accessPoints = wifiDevice.get_access_points();
+        const bestByBssid = new Map<string, ScannedNetwork>();
+
+        for (const ap of accessPoints) {
+            const apSsid = this.decodeSsid(ap.get_ssid());
+            if (apSsid !== ssid) continue;
+
+            const bssid = (ap.get_bssid() ?? '').toLowerCase();
+            if (!bssid) continue;
+
+            const strength = ap.get_strength();
+            const existing = bestByBssid.get(bssid);
+            if (existing && (existing.signalPercent as number) >= strength) continue;
+
+            const frequency = asFrequencyMHz(ap.get_frequency());
+            const generation = this.generationMap.get(bssid) ?? WIFI_GENERATIONS.UNKNOWN;
+
+            bestByBssid.set(bssid, Object.freeze({
+                ssid: apSsid,
+                bssid,
+                frequency,
+                channel: frequencyToChannel(frequency),
+                band: frequencyToBand(frequency),
+                bandwidth: getApBandwidth(ap),
+                maxBitrate: asBitrateMbps(ap.get_max_bitrate() / 1000),
+                signalPercent: asSignalPercent(strength),
+                security: getSecurityProtocol(ap),
+                generation,
+            }));
+        }
+
+        return sortBySignalStrength([...bestByBssid.values()]);
+    }
+
     async getAvailableNetworks(excludeSsid?: string): Promise<Map<string, ScannedNetwork[]>> {
         if (!this.client) return new Map();
 

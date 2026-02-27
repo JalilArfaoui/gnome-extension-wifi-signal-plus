@@ -184,10 +184,20 @@
     color: #e01b24;
 }
 
+/* Access Points - connected AP icon */
+.wifi-ap-connected-icon {
+    color: #33d17a;
+}
+
+/* Access Points - spacer matching icon width for non-connected rows */
+.wifi-ap-icon-spacer {
+    width: 12px;
+}
+
 /* Nearby networks - AP sub-rows */
 .wifi-nearby-ap {
     min-height: 0;
-    padding: 3px 8px 3px 30px;
+    padding: 3px 8px 3px 12px;
 }
 
 .wifi-nearby-ap-bssid {
