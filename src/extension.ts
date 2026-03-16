@@ -41,7 +41,8 @@ import {
 const REFRESH_INTERVAL_SECONDS = 5;
 const BACKGROUND_SCAN_INTERVAL_SECONDS = 300;
 const PLACEHOLDER = '--' as const;
-// WiFi 7 theoretical max: 320 MHz, MCS 13 (4096-QAM 5/6), 4×4 MIMO, GI 0.8µs
+// WiFi 7 theoretical max: 320 MHz, MCS 13 (4096-QAM 5/6), 4×4 MIMO, GI 0.8µs.
+// Speed bar uses logarithmic scale so real-world values fill the gauge meaningfully.
 const MAX_SPEED_MBPS = 5760;
 const MAX_CHANNEL_WIDTH_MHZ = 320;
 const MIN_SIGNAL_DBM = -90;
@@ -588,7 +589,8 @@ export default class WifiSignalPlusExtension extends Extension {
 
     private getSpeedPercent(info: ConnectedInfo): number {
         const speed = Math.max(info.txBitrate ?? 0, info.rxBitrate ?? 0, info.bitrate);
-        return Math.min(100, (speed / MAX_SPEED_MBPS) * 100);
+        if (speed <= 0) return 0;
+        return Math.min(100, (Math.log(1 + speed) / Math.log(1 + MAX_SPEED_MBPS)) * 100);
     }
 
     private getWidthPercent(width: ChannelWidthMHz | null): number {
