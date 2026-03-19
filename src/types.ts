@@ -142,7 +142,6 @@ export interface ConnectedInfo extends BaseConnectionInfo {
     readonly channelWidth: ChannelWidthMHz | null;
     readonly txBitrate: BitrateMbps | null;
     readonly rxBitrate: BitrateMbps | null;
-    readonly maxBitrate: BitrateMbps;
 }
 
 export interface ScannedNetwork {
