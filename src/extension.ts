@@ -272,7 +272,7 @@ export default class WifiSignalPlusExtension extends Extension {
         item.add_style_class_name('wifi-connection-header');
 
         const leftBox = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -333,7 +333,7 @@ export default class WifiSignalPlusExtension extends Extension {
 
         let barFill: St.Widget | undefined;
         if (withBar) {
-            const box = new St.BoxLayout({ vertical: true, x_expand: true });
+            const box = new St.BoxLayout({ orientation: Clutter.Orientation.VERTICAL, x_expand: true });
 
             const row = new St.BoxLayout({ x_expand: true });
             row.add_child(labelWidget);
@@ -773,7 +773,7 @@ export default class WifiSignalPlusExtension extends Extension {
         const metricsBox = this.createCardMetrics(bestAp, apCount);
         headerBox.add_child(metricsBox);
 
-        const outerBox = new St.BoxLayout({ vertical: true, x_expand: true });
+        const outerBox = new St.BoxLayout({ orientation: Clutter.Orientation.VERTICAL, x_expand: true });
         outerBox.add_child(headerBox);
 
         const quality = getSignalQualityFromPercent(bestAp.signalPercent);
@@ -856,7 +856,7 @@ export default class WifiSignalPlusExtension extends Extension {
             item.add_child(spacer);
         }
 
-        const outerBox = new St.BoxLayout({ vertical: true, x_expand: true });
+        const outerBox = new St.BoxLayout({ orientation: Clutter.Orientation.VERTICAL, x_expand: true });
 
         // Info row: generation + BSSID + details + signal%
         const infoRow = new St.BoxLayout({ x_expand: true });
