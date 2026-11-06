@@ -61,6 +61,18 @@ npm run nested:safe   # Test in a nested GNOME Shell (isolated XDG_DATA_HOME)
 npm run pack          # Build the zip for extensions.gnome.org submission
 ```
 
+## Translations
+
+Translations use gettext (domain `wifi-signal-plus@jalil.arfaoui.net`). The files are in `po/`:
+
+```bash
+npm run pot                                   # Regenerate the template after changing strings
+msginit -l fr -i po/wifi-signal-plus@jalil.arfaoui.net.pot -o po/fr.po   # Start a new language
+msgmerge -U po/it.po po/wifi-signal-plus@jalil.arfaoui.net.pot           # Update an existing language
+```
+
+`npm run build` compiles the `.po` files into `dist/locale/`, and `npm run pack` adds them to the zip.
+
 ## License
 
 [GPL-2.0](LICENSE)

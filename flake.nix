@@ -29,6 +29,7 @@
 
             # Outils de développement
             gnome-extensions-cli
+            gettext
           ];
 
           shellHook = ''

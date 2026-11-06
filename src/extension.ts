@@ -8,7 +8,11 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import {
+    Extension,
+    gettext as _,
+    pgettext,
+} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
@@ -32,8 +36,12 @@ import {
     getSignalQualityFromPercent,
     getSpeedQuality,
     type GenerationCssClass,
+    type ChannelNumber,
     type ChannelWidthMHz,
+    type FrequencyBand,
+    type SecurityProtocol,
     type SignalDbm,
+    type SignalQuality,
     type SpeedQuality,
     type WifiGeneration,
 } from './types.js';
@@ -74,6 +82,41 @@ const SPEED_QUALITY_COLORS: Readonly<Record<SpeedQuality, string>> = {
     Poor: '#e01b24',
 };
 
+// Marks a string for translation without translating it yet (it is translated where it is shown).
+const N_ = (text: string): string => text;
+
+function formatSignalQuality(quality: SignalQuality): string {
+    switch (quality) {
+        case 'Excellent':
+            return pgettext('signal quality', 'Excellent');
+        case 'Good':
+            return pgettext('signal quality', 'Good');
+        case 'Fair':
+            return pgettext('signal quality', 'Fair');
+        case 'Weak':
+            return pgettext('signal quality', 'Weak');
+        case 'Poor':
+            return pgettext('signal quality', 'Poor');
+        case 'Unknown':
+            return pgettext('signal quality', 'Unknown');
+    }
+}
+
+function formatSecurity(security: SecurityProtocol): string {
+    if (security === 'Open') return pgettext('network security', 'Open');
+    if (security === 'Unknown') return pgettext('network security', 'Unknown');
+    return security;
+}
+
+function formatFrequencyBand(band: FrequencyBand): string {
+    return band === 'Unknown' ? pgettext('frequency band', 'Unknown') : band;
+}
+
+function formatChannel(channel: ChannelNumber): string {
+    // TRANSLATORS: Short for "channel", followed by the WiFi channel number (e.g. "Ch 36").
+    return `${_('Ch')} ${channel}`;
+}
+
 type MenuItemId =
     | 'bitrate'
     | 'channelWidth'
@@ -90,14 +133,16 @@ interface MenuItemConfig {
 const MENU_STRUCTURE: readonly MenuItemConfig[][] = [
     // Section: Performance
     [
-        { id: 'bitrate', label: 'Speed' },
-        { id: 'channelWidth', label: 'Width' },
-        { id: 'mcs', label: 'Modulation' },
+        { id: 'bitrate', label: N_('Speed') },
+        // TRANSLATORS: Width of the WiFi channel, shown in MHz.
+        { id: 'channelWidth', label: N_('Width') },
+        // TRANSLATORS: Shows MCS index, spatial streams (MIMO) and guard interval.
+        { id: 'mcs', label: N_('Modulation') },
     ],
     // Section: Signal & Security
     [
-        { id: 'signal', label: 'Signal' },
-        { id: 'security', label: 'Security' },
+        { id: 'signal', label: N_('Signal') },
+        { id: 'security', label: N_('Security') },
         { id: 'bssid', label: 'BSSID' },
     ],
 ] as const;
@@ -237,7 +282,7 @@ export default class WifiSignalPlusExtension extends Extension {
 
         this.addConnectionHeader(menu);
 
-        const sectionHeaders = ['Performance', 'Signal'];
+        const sectionHeaders = [_('Performance'), _('Signal')];
 
         const SIGNAL_SECTION_INDEX = 1;
 
@@ -249,18 +294,18 @@ export default class WifiSignalPlusExtension extends Extension {
             }
 
             for (const { id, label } of section) {
-                this.addMenuItem(menu, id, label, ITEMS_WITH_BAR.has(id));
+                this.addMenuItem(menu, id, _(label), ITEMS_WITH_BAR.has(id));
             }
         });
 
-        this.accessPointsSeparator = new PopupMenu.PopupSeparatorMenuItem('Access Points');
+        this.accessPointsSeparator = new PopupMenu.PopupSeparatorMenuItem(_('Access Points'));
         this.accessPointsSeparator.visible = false;
         menu.addMenuItem(this.accessPointsSeparator);
         this.accessPointsSection = new PopupMenu.PopupMenuSection();
         this.accessPointsSection.actor.visible = false;
         menu.addMenuItem(this.accessPointsSection);
 
-        this.nearbySeparator = new PopupMenu.PopupSeparatorMenuItem('Nearby Networks');
+        this.nearbySeparator = new PopupMenu.PopupSeparatorMenuItem(_('Nearby Networks'));
         menu.addMenuItem(this.nearbySeparator);
 
         this.nearbySection = new PopupMenu.PopupMenuSection();
@@ -536,7 +581,7 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private showDisconnectedState(): void {
-        this.headerSsidLabel?.set_text('Not connected');
+        this.headerSsidLabel?.set_text(_('Not connected'));
         this.headerGenerationLabel?.set_text('');
         this.headerBandLabel?.set_text('');
         if (this.headerIcon) {
@@ -573,7 +618,7 @@ export default class WifiSignalPlusExtension extends Extension {
         );
         this.updateMenuItem('mcs', this.formatModulation(info));
         this.updateMenuItem('signal', this.formatSignal(info.signalStrength));
-        this.updateMenuItem('security', info.security);
+        this.updateMenuItem('security', formatSecurity(info.security));
         this.updateMenuItem('bssid', info.bssid);
 
         this.pushSignalHistory(info.signalStrength);
@@ -599,7 +644,7 @@ export default class WifiSignalPlusExtension extends Extension {
     }
 
     private formatBand(info: ConnectedInfo): string {
-        return `${info.band} · Ch ${info.channel}`;
+        return `${formatFrequencyBand(info.band)} · ${formatChannel(info.channel)}`;
     }
 
     private formatBitrate(info: ConnectedInfo): string {
@@ -639,7 +684,7 @@ export default class WifiSignalPlusExtension extends Extension {
 
     private formatSignal(signalStrength: SignalDbm): string {
         const quality = getSignalQuality(signalStrength);
-        return `${signalStrength} dBm (${quality})`;
+        return `${signalStrength} dBm (${formatSignalQuality(quality)})`;
     }
 
     private async updateAccessPoints(): Promise<void> {
@@ -818,7 +863,7 @@ export default class WifiSignalPlusExtension extends Extension {
 
         // Security badge
         const secBadge = new St.Label({
-            text: ap.security,
+            text: formatSecurity(ap.security),
             style_class: ap.security === 'Open'
                 ? 'wifi-nearby-badge wifi-nearby-badge-open'
                 : 'wifi-nearby-badge',
@@ -880,8 +925,8 @@ export default class WifiSignalPlusExtension extends Extension {
         infoRow.add_child(bssidLabel);
 
         const detailParts: string[] = [];
-        detailParts.push(ap.band);
-        detailParts.push(`Ch ${ap.channel}`);
+        detailParts.push(formatFrequencyBand(ap.band));
+        detailParts.push(formatChannel(ap.channel));
         if ((ap.bandwidth as number) > 20) {
             detailParts.push(`${ap.bandwidth} MHz`);
         }

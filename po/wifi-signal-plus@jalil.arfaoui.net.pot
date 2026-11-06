@@ -1,0 +1,106 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the wifi-signal-plus package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: wifi-signal-plus\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-06 17:56+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/extension.ts:91
+msgctxt "signal quality"
+msgid "Excellent"
+msgstr ""
+
+#: src/extension.ts:93
+msgctxt "signal quality"
+msgid "Good"
+msgstr ""
+
+#: src/extension.ts:95
+msgctxt "signal quality"
+msgid "Fair"
+msgstr ""
+
+#: src/extension.ts:97
+msgctxt "signal quality"
+msgid "Weak"
+msgstr ""
+
+#: src/extension.ts:99
+msgctxt "signal quality"
+msgid "Poor"
+msgstr ""
+
+#: src/extension.ts:101
+msgctxt "signal quality"
+msgid "Unknown"
+msgstr ""
+
+#: src/extension.ts:106
+msgctxt "network security"
+msgid "Open"
+msgstr ""
+
+#: src/extension.ts:107
+msgctxt "network security"
+msgid "Unknown"
+msgstr ""
+
+#: src/extension.ts:112
+msgctxt "frequency band"
+msgid "Unknown"
+msgstr ""
+
+#. TRANSLATORS: Short for "channel", followed by the WiFi channel number (e.g. "Ch 36").
+#: src/extension.ts:117
+msgid "Ch"
+msgstr ""
+
+#: src/extension.ts:136
+msgid "Speed"
+msgstr ""
+
+#. TRANSLATORS: Width of the WiFi channel, shown in MHz.
+#: src/extension.ts:138
+msgid "Width"
+msgstr ""
+
+#. TRANSLATORS: Shows MCS index, spatial streams (MIMO) and guard interval.
+#: src/extension.ts:140
+msgid "Modulation"
+msgstr ""
+
+#: src/extension.ts:144 src/extension.ts:285
+msgid "Signal"
+msgstr ""
+
+#: src/extension.ts:145
+msgid "Security"
+msgstr ""
+
+#: src/extension.ts:285
+msgid "Performance"
+msgstr ""
+
+#: src/extension.ts:301
+msgid "Access Points"
+msgstr ""
+
+#: src/extension.ts:308
+msgid "Nearby Networks"
+msgstr ""
+
+#: src/extension.ts:584
+msgid "Not connected"
+msgstr ""
